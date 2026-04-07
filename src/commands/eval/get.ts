@@ -6,8 +6,8 @@ import { handleError } from "../../lib/errors.js";
 import type { GlobalOptions } from "../../types/index.js";
 
 export const evalGetCommand = new Command("get")
-  .description("Get details of a specific evaluation")
-  .argument("<id>", "Evaluation ID")
+  .description("Get details of a specific evaluation run")
+  .argument("<id>", "Evaluation run ID")
   .addHelpText(
     "after",
     `
@@ -20,7 +20,7 @@ Examples:
       const globalOpts = cmd.optsWithGlobals<GlobalOptions>();
       const client = getAuthenticatedClient(globalOpts.profile);
 
-      const spinner = ora("Fetching evaluation...").start();
+      const spinner = ora("Fetching evaluation run...").start();
       const evaluation = await client.getEval(id);
       spinner.stop();
 
@@ -29,16 +29,19 @@ Examples:
       } else {
         printKeyValue({
           ID: evaluation.id,
-          Name: evaluation.name ?? "—",
+          "Suite ID": evaluation.suite_id,
+          "Agent ID": evaluation.agent_id,
           "Dataset ID": evaluation.dataset_id ?? "—",
           Status: evaluation.status,
-          Score: evaluation.score ?? "—",
+          "Pass Rate": evaluation.pass_rate ?? "—",
+          "Avg Score": evaluation.avg_score ?? "—",
+          "Started At": evaluation.started_at,
+          "Completed At": evaluation.completed_at ?? "—",
           Created: evaluation.created_at ?? "—",
-          Completed: evaluation.completed_at ?? "—",
+          "Source Type": evaluation.source_type ?? "—",
         });
-        if (evaluation.metrics && Object.keys(evaluation.metrics).length > 0) {
-          console.log("\nMetrics:");
-          console.log(JSON.stringify(evaluation.metrics, null, 2));
+        if (evaluation.results && evaluation.results.length > 0) {
+          console.log(`\nResults: ${evaluation.results.length}`);
         }
       }
     } catch (error) {

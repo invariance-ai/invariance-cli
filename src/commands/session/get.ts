@@ -29,16 +29,15 @@ Examples:
       } else {
         printKeyValue({
           ID: session.id,
-          "Trace ID": session.trace_id ?? "—",
-          "Agent ID": session.agent_id ?? "—",
+          Name: session.name,
+          "Created By": session.created_by,
           Status: session.status,
-          Started: session.started_at ?? "—",
-          Ended: session.ended_at ?? "—",
+          Created: session.created_at,
+          Closed: session.closed_at ?? "—",
+          "Receipt Count": session.receipt_count ?? "—",
+          "Root Hash": session.root_hash ?? "—",
+          "Close Hash": session.close_hash ?? "—",
         });
-        if (session.metadata && Object.keys(session.metadata).length > 0) {
-          console.log("\nMetadata:");
-          console.log(JSON.stringify(session.metadata, null, 2));
-        }
       }
     } catch (error) {
       handleError(error);

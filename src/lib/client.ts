@@ -7,11 +7,8 @@ import {
   SignalListSchema,
   QueryResultSchema,
   DatasetSchema,
-  DatasetListSchema,
   EvaluationSchema,
-  EvalListSchema,
   SessionSchema,
-  SessionListSchema,
   type User,
   type Trace,
   type TraceList,
@@ -20,11 +17,8 @@ import {
   type SignalList,
   type QueryResult,
   type Dataset,
-  type DatasetList,
   type Evaluation,
-  type EvalList,
   type Session,
-  type SessionList,
 } from "../types/index.js";
 import { ApiError, AuthenticationError, NetworkError, NotFoundError } from "./errors.js";
 
@@ -147,12 +141,12 @@ export class InvarianceClient {
     return SignalListSchema.parse(data);
   }
 
-  async listDatasets(options?: { limit?: number }): Promise<DatasetList> {
+  async listDatasets(options?: { agentId?: string }): Promise<Dataset[]> {
     const params: Record<string, string | undefined> = {};
-    if (options?.limit !== undefined) params["limit"] = String(options.limit);
+    if (options?.agentId) params["agent_id"] = options.agentId;
 
     const data = await this.request<unknown>("GET", "/v1/datasets", { params });
-    return DatasetListSchema.parse(data);
+    return DatasetSchema.array().parse(data);
   }
 
   async getDataset(id: string): Promise<Dataset> {
@@ -160,34 +154,59 @@ export class InvarianceClient {
     return DatasetSchema.parse(data);
   }
 
-  async listEvals(options?: { limit?: number; datasetId?: string }): Promise<EvalList> {
+  async listEvals(options?: {
+    suiteId?: string;
+    agentId?: string;
+    status?: string;
+    datasetId?: string;
+  }): Promise<Evaluation[]> {
     const params: Record<string, string | undefined> = {};
-    if (options?.limit !== undefined) params["limit"] = String(options.limit);
+    if (options?.suiteId) params["suite_id"] = options.suiteId;
+    if (options?.agentId) params["agent_id"] = options.agentId;
+    if (options?.status) params["status"] = options.status;
     if (options?.datasetId) params["dataset_id"] = options.datasetId;
 
-    const data = await this.request<unknown>("GET", "/v1/evals", { params });
-    return EvalListSchema.parse(data);
+    const data = await this.request<unknown>("GET", "/v1/evals/runs", { params });
+    return EvaluationSchema.array().parse(data);
   }
 
   async getEval(id: string): Promise<Evaluation> {
-    const data = await this.request<unknown>("GET", `/v1/evals/${encodeURIComponent(id)}`);
+    const data = await this.request<unknown>("GET", `/v1/evals/runs/${encodeURIComponent(id)}`);
     return EvaluationSchema.parse(data);
   }
 
-  async runEval(datasetId: string, options?: { name?: string }): Promise<Evaluation> {
-    const data = await this.request<unknown>("POST", "/v1/evals", {
-      body: { dataset_id: datasetId, name: options?.name },
+  async runEval(
+    suiteId: string,
+    options: {
+      agentId: string;
+      versionLabel?: string;
+      sessionIds?: string[];
+    },
+  ): Promise<Evaluation> {
+    const data = await this.request<unknown>("POST", `/v1/evals/suites/${encodeURIComponent(suiteId)}/run`, {
+      body: {
+        agent_id: options.agentId,
+        version_label: options.versionLabel,
+        session_ids: options.sessionIds,
+      },
     });
     return EvaluationSchema.parse(data);
   }
 
-  async listSessions(options?: { limit?: number; status?: string }): Promise<SessionList> {
+  async listSessions(options?: {
+    limit?: number;
+    status?: string;
+    offset?: number;
+    agentId?: string;
+  }): Promise<Session[]> {
     const params: Record<string, string | undefined> = {};
     if (options?.limit !== undefined) params["limit"] = String(options.limit);
+    if (options?.offset !== undefined) params["offset"] = String(options.offset);
     if (options?.status) params["status"] = options.status;
+    if (options?.agentId) params["agent_id"] = options.agentId;
 
     const data = await this.request<unknown>("GET", "/v1/sessions", { params });
-    return SessionListSchema.parse(data);
+    return SessionSchema.array().parse(data);
   }
 
   async getSession(id: string): Promise<Session> {

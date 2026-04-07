@@ -7,7 +7,7 @@ import type { GlobalOptions } from "../../types/index.js";
 
 export const datasetListCommand = new Command("list")
   .description("List datasets")
-  .option("--limit <n>", "Maximum number of datasets to return", parseInt)
+  .option("--agent-id <id>", "Filter by agent ID")
   .addHelpText(
     "after",
     `
@@ -16,21 +16,24 @@ Examples:
   $ invariance dataset list --limit 10
   $ invariance dataset list --json`,
   )
-  .action(async (options: { limit?: number }, cmd: Command) => {
+  .action(async (options: { agentId?: string }, cmd: Command) => {
     try {
       const globalOpts = cmd.optsWithGlobals<GlobalOptions>();
       const client = getAuthenticatedClient(globalOpts.profile);
 
       const spinner = ora("Fetching datasets...").start();
-      const result = await client.listDatasets({ limit: options.limit });
+      const result = await client.listDatasets({
+        agentId: options.agentId,
+      });
       spinner.stop();
 
       printTable(
-        result.data,
+        result,
         [
           { key: "id", label: "ID", width: 24 },
           { key: "name", label: "Name", width: 30 },
-          { key: "size", label: "Size", width: 10 },
+          { key: "row_count", label: "Rows", width: 10 },
+          { key: "agent_id", label: "Agent ID", width: 24 },
           { key: "created_at", label: "Created", width: 20 },
         ],
         { json: globalOpts.json },

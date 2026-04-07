@@ -31,9 +31,12 @@ Examples:
           ID: dataset.id,
           Name: dataset.name,
           Description: dataset.description ?? "—",
-          Size: dataset.size ?? "—",
-          Created: dataset.created_at ?? "—",
-          Updated: dataset.updated_at ?? "—",
+          "Agent ID": dataset.agent_id ?? "—",
+          "Row Count": dataset.row_count,
+          "Draft Version": dataset.current_draft_version,
+          "Published Version": dataset.latest_published_version,
+          Created: dataset.created_at,
+          Updated: dataset.updated_at,
         });
       }
     } catch (error) {

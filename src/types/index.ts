@@ -95,66 +95,60 @@ export type QueryResult = z.infer<typeof QueryResultSchema>;
 export const DatasetSchema = z.object({
   id: z.string(),
   name: z.string(),
-  description: z.string().optional(),
-  size: z.number().optional(),
-  created_at: z.string().optional(),
-  updated_at: z.string().optional(),
+  description: z.string().nullable(),
+  agent_id: z.string().nullable(),
+  owner_id: z.string(),
+  current_draft_version: z.number(),
+  latest_published_version: z.number(),
+  row_count: z.number(),
+  metadata: z.record(z.string(), z.unknown()),
+  created_at: z.string(),
+  updated_at: z.string(),
 });
 
 export type Dataset = z.infer<typeof DatasetSchema>;
-
-export const DatasetListSchema = z.object({
-  data: z.array(DatasetSchema),
-  total: z.number().optional(),
-  has_more: z.boolean().optional(),
-});
-
-export type DatasetList = z.infer<typeof DatasetListSchema>;
 
 // ── Evaluation Schemas ──
 
 export const EvaluationSchema = z.object({
   id: z.string(),
-  name: z.string().optional(),
-  dataset_id: z.string().optional(),
+  suite_id: z.string(),
+  agent_id: z.string(),
+  version_label: z.string().nullable().optional(),
   status: z.string(),
-  score: z.number().optional(),
-  metrics: z.record(z.string(), z.unknown()).optional(),
+  total_cases: z.number().optional(),
+  passed_cases: z.number().optional(),
+  failed_cases: z.number().optional(),
+  pass_rate: z.number().nullable().optional(),
+  avg_score: z.number().nullable().optional(),
+  duration_ms: z.number().nullable().optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+  owner_id: z.string().optional(),
+  started_at: z.string(),
+  completed_at: z.string().nullable(),
   created_at: z.string().optional(),
-  completed_at: z.string().optional(),
+  dataset_id: z.string().nullable().optional(),
+  source_type: z.string().optional(),
+  results: z.array(z.record(z.string(), z.unknown())).optional(),
 });
 
 export type Evaluation = z.infer<typeof EvaluationSchema>;
-
-export const EvalListSchema = z.object({
-  data: z.array(EvaluationSchema),
-  total: z.number().optional(),
-  has_more: z.boolean().optional(),
-});
-
-export type EvalList = z.infer<typeof EvalListSchema>;
 
 // ── Session Schemas ──
 
 export const SessionSchema = z.object({
   id: z.string(),
-  trace_id: z.string().optional(),
-  agent_id: z.string().optional(),
+  name: z.string(),
+  created_by: z.string(),
   status: z.string(),
-  started_at: z.string().optional(),
-  ended_at: z.string().optional(),
-  metadata: z.record(z.string(), z.unknown()).optional(),
+  created_at: z.string(),
+  closed_at: z.string().nullable().optional(),
+  root_hash: z.string().nullable().optional(),
+  close_hash: z.string().nullable().optional(),
+  receipt_count: z.number().optional(),
 });
 
 export type Session = z.infer<typeof SessionSchema>;
-
-export const SessionListSchema = z.object({
-  data: z.array(SessionSchema),
-  total: z.number().optional(),
-  has_more: z.boolean().optional(),
-});
-
-export type SessionList = z.infer<typeof SessionListSchema>;
 
 // ── Config Types ──
 
