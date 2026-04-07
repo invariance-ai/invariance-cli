@@ -13,6 +13,14 @@ import { signalListCommand } from "./commands/signal/list.js";
 import { queryCommand } from "./commands/query.js";
 import { initCommand } from "./commands/init.js";
 import { doctorCommand } from "./commands/doctor.js";
+import { evalListCommand } from "./commands/eval/list.js";
+import { evalGetCommand } from "./commands/eval/get.js";
+import { evalRunCommand } from "./commands/eval/run.js";
+import { datasetListCommand } from "./commands/dataset/list.js";
+import { datasetGetCommand } from "./commands/dataset/get.js";
+import { sessionListCommand } from "./commands/session/list.js";
+import { sessionGetCommand } from "./commands/session/get.js";
+import { completionsCommand } from "./commands/completions.js";
 import { versionCommand } from "./commands/version.js";
 
 const program = new Command();
@@ -54,7 +62,27 @@ const signal = new Command("signal").description("View signals");
 signal.addCommand(signalListCommand);
 program.addCommand(signal);
 
+// eval
+const eval_ = new Command("eval").description("Manage and run evaluations");
+eval_.addCommand(evalListCommand);
+eval_.addCommand(evalGetCommand);
+eval_.addCommand(evalRunCommand);
+program.addCommand(eval_);
+
+// dataset
+const dataset = new Command("dataset").description("Manage datasets");
+dataset.addCommand(datasetListCommand);
+dataset.addCommand(datasetGetCommand);
+program.addCommand(dataset);
+
+// session
+const session = new Command("session").description("Inspect sessions");
+session.addCommand(sessionListCommand);
+session.addCommand(sessionGetCommand);
+program.addCommand(session);
+
 // top-level commands
+program.addCommand(completionsCommand);
 program.addCommand(queryCommand);
 program.addCommand(initCommand);
 program.addCommand(doctorCommand);

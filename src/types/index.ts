@@ -90,6 +90,72 @@ export const QueryResultSchema = z.object({
 
 export type QueryResult = z.infer<typeof QueryResultSchema>;
 
+// ── Dataset Schemas ──
+
+export const DatasetSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string().optional(),
+  size: z.number().optional(),
+  created_at: z.string().optional(),
+  updated_at: z.string().optional(),
+});
+
+export type Dataset = z.infer<typeof DatasetSchema>;
+
+export const DatasetListSchema = z.object({
+  data: z.array(DatasetSchema),
+  total: z.number().optional(),
+  has_more: z.boolean().optional(),
+});
+
+export type DatasetList = z.infer<typeof DatasetListSchema>;
+
+// ── Evaluation Schemas ──
+
+export const EvaluationSchema = z.object({
+  id: z.string(),
+  name: z.string().optional(),
+  dataset_id: z.string().optional(),
+  status: z.string(),
+  score: z.number().optional(),
+  metrics: z.record(z.string(), z.unknown()).optional(),
+  created_at: z.string().optional(),
+  completed_at: z.string().optional(),
+});
+
+export type Evaluation = z.infer<typeof EvaluationSchema>;
+
+export const EvalListSchema = z.object({
+  data: z.array(EvaluationSchema),
+  total: z.number().optional(),
+  has_more: z.boolean().optional(),
+});
+
+export type EvalList = z.infer<typeof EvalListSchema>;
+
+// ── Session Schemas ──
+
+export const SessionSchema = z.object({
+  id: z.string(),
+  trace_id: z.string().optional(),
+  agent_id: z.string().optional(),
+  status: z.string(),
+  started_at: z.string().optional(),
+  ended_at: z.string().optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+});
+
+export type Session = z.infer<typeof SessionSchema>;
+
+export const SessionListSchema = z.object({
+  data: z.array(SessionSchema),
+  total: z.number().optional(),
+  has_more: z.boolean().optional(),
+});
+
+export type SessionList = z.infer<typeof SessionListSchema>;
+
 // ── Config Types ──
 
 export const ConfigSchema = z.object({
