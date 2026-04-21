@@ -3,22 +3,18 @@ import { Command } from "commander";
 const COMMANDS: Record<string, string[]> = {
   auth: ["login", "logout", "whoami"],
   config: ["get", "set"],
-  trace: ["list", "get"],
-  monitor: ["list", "run"],
-  signal: ["list"],
-  eval: ["list", "get", "run"],
-  dataset: ["list", "get"],
-  session: ["list", "get"],
+  run: ["start", "list", "get", "update", "cancel", "fork", "metrics", "verify", "narrative", "llm-calls", "nodes"],
+  node: ["write", "list", "tail"],
+  monitor: ["create", "list", "get", "update", "pause", "resume", "evaluate", "executions", "findings"],
+  signal: ["emit", "list", "get", "ack", "resolve"],
+  finding: ["list", "get", "update"],
+  review: ["list", "get", "claim", "unclaim", "resolve"],
+  agent: ["me", "list", "get", "set-key"],
+  metrics: ["overview"],
   completions: ["bash", "zsh", "fish"],
 };
 
-const TOP_LEVEL = [
-  ...Object.keys(COMMANDS),
-  "query",
-  "init",
-  "doctor",
-  "version",
-];
+const TOP_LEVEL = [...Object.keys(COMMANDS), "doctor", "version"];
 
 function bashCompletionScript(): string {
   const subcommandCases = Object.entries(COMMANDS)

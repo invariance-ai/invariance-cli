@@ -20,11 +20,18 @@ pnpm add -g @invariance/cli
 # Authenticate
 invariance auth login
 
-# Run a query
-invariance query "Show me all failed traces from the last hour"
+# Confirm identity
+invariance agent me
 
-# List recent traces
-invariance trace list --limit 10
+# Start a run, write a trace node, verify the proof chain
+RUN=$(invariance run start --name demo --json | jq -r .id)
+invariance node write "$RUN" --action-type tool_call --input '{"x":1}' --output '{"y":2}'
+invariance run verify "$RUN"
+
+# Monitors, signals, reviews
+invariance monitor list
+invariance signal list
+invariance review list
 
 # Check your setup
 invariance doctor
@@ -37,15 +44,21 @@ invariance doctor
 | `auth login` | Authenticate with the Invariance API |
 | `auth logout` | Clear stored credentials |
 | `auth whoami` | Display the current user |
-| `config get <key>` | Read a config value |
-| `config set <key> <value>` | Set a config value |
-| `trace list` | List traces |
-| `trace get <id>` | Get trace details |
-| `query <prompt>` | Run a natural-language query |
-| `monitor list` | List monitors |
-| `monitor run <id>` | Run a monitor |
-| `signal list` | List signals |
-| `init` | Initialize Invariance in the current project |
+| `config get <key>` / `set` | Read/write a config value |
+| `run start` / `list` / `get <id>` | Start, list, inspect runs |
+| `run update` / `cancel` / `fork` | Mutate run state |
+| `run metrics <id>` / `verify <id>` | Aggregate metrics / verify proof chain |
+| `run narrative <id>` / `llm-calls <id>` / `nodes <id>` | LLM-generated summary, LLM call log, node list |
+| `node write <run_id>` / `list` / `tail` | Write, list, stream trace nodes |
+| `monitor create` / `list` / `get` / `update` | CRUD monitors |
+| `monitor pause` / `resume` / `evaluate` | Control + trigger monitors |
+| `monitor executions <id>` / `findings <id>` | Inspect monitor output |
+| `signal emit` / `list` / `get` / `ack` / `resolve` | Alert lifecycle |
+| `finding list` / `get` / `update` | Investigation records |
+| `review list` / `get` / `claim` / `unclaim` / `resolve` | Resolution workflow |
+| `agent me` / `list` / `get` / `set-key` | Identity + key registration |
+| `metrics overview` | Aggregate metrics across runs |
+| `completions <shell>` | Shell completion scripts |
 | `doctor` | Check CLI setup for issues |
 | `version` | Print the CLI version |
 

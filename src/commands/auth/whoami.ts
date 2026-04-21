@@ -6,7 +6,7 @@ import { handleError } from "../../lib/errors.js";
 import type { GlobalOptions } from "../../types/index.js";
 
 export const whoamiCommand = new Command("whoami")
-  .description("Display the currently authenticated user")
+  .description("Display the currently authenticated agent")
   .addHelpText(
     "after",
     `
@@ -19,19 +19,19 @@ Examples:
       const globalOpts = cmd.optsWithGlobals<GlobalOptions>();
       const client = getAuthenticatedClient(globalOpts.profile);
 
-      const spinner = ora("Fetching user info...").start();
-      const user = await client.whoami();
+      const spinner = ora("Fetching identity...").start();
+      const me = await client.me();
       spinner.stop();
 
       if (globalOpts.json) {
-        formatOutput(user, { json: true });
+        formatOutput(me, { json: true });
       } else {
         printKeyValue({
-          ID: user.id,
-          Email: user.email,
-          Name: user.name ?? "—",
-          Organization: user.organization?.name ?? "—",
-          "Org ID": user.organization?.id ?? "—",
+          "Agent ID": me.agent.id,
+          Name: me.agent.name,
+          Project: me.agent.project_id,
+          "Public key": me.agent.public_key ?? "—",
+          "API key": me.api_key ? `${me.api_key.prefix}_*** (${me.api_key.label})` : "—",
         });
       }
     } catch (error) {

@@ -27,7 +27,7 @@ export async function validateApiKey(
 ): Promise<{ valid: boolean; error?: string }> {
   const client = new InvarianceClient({ apiKey, baseUrl });
   try {
-    await client.whoami();
+    await client.me();
     return { valid: true };
   } catch (error) {
     if (error instanceof AuthenticationError) {
