@@ -1,6 +1,6 @@
 import { Command } from "commander";
 
-const COMMANDS: Record<string, string[]> = {
+export const COMMANDS: Record<string, string[]> = {
   auth: ["login", "logout", "whoami"],
   config: ["get", "set"],
   run: ["start", "list", "get", "update", "cancel", "fork", "metrics", "verify", "narrative", "llm-calls", "nodes"],
@@ -14,7 +14,13 @@ const COMMANDS: Record<string, string[]> = {
   completions: ["bash", "zsh", "fish"],
 };
 
-const TOP_LEVEL = [...Object.keys(COMMANDS), "doctor", "version"];
+const TOP_LEVEL = [
+  ...Object.keys(COMMANDS),
+  "login",
+  "logout",
+  "doctor",
+  "version",
+];
 
 function bashCompletionScript(): string {
   const subcommandCases = Object.entries(COMMANDS)
