@@ -9,7 +9,7 @@ const COMMANDS: Record<string, string[]> = {
   signal: ["emit", "list", "get", "ack", "resolve"],
   finding: ["list", "get", "update"],
   review: ["list", "get", "claim", "unclaim", "resolve"],
-  agent: ["me", "list", "get", "set-key"],
+  agent: ["me", "set-key"],
   metrics: ["overview"],
   completions: ["bash", "zsh", "fish"],
 };
