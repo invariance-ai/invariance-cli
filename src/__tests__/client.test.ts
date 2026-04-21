@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { InvarianceClient, buildUrl } from "../lib/client.js";
 import { AuthenticationError, NetworkError, ApiError } from "../lib/errors.js";
 
-const BASE = "https://api.invariance.ai";
+const BASE = "https://api.useinvariance.com";
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {

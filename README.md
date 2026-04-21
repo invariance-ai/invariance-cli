@@ -56,7 +56,7 @@ invariance doctor
 | `signal emit` / `list` / `get` / `ack` / `resolve` | Alert lifecycle |
 | `finding list` / `get` / `update` | Investigation records |
 | `review list` / `get` / `claim` / `unclaim` / `resolve` | Resolution workflow |
-| `agent me` / `list` / `get` / `set-key` | Identity + key registration |
+| `agent me` / `set-key` | Identity + key registration |
 | `metrics overview` | Aggregate metrics across runs |
 | `completions <shell>` | Shell completion scripts |
 | `doctor` | Check CLI setup for issues |
@@ -70,13 +70,13 @@ The CLI reads configuration from (highest priority first):
 
 1. **Environment variables**
    - `INVARIANCE_API_KEY` — API key
-   - `INVARIANCE_BASE_URL` — API base URL (default: `https://api.invariance.ai`)
+   - `INVARIANCE_BASE_URL` — API base URL (default: `https://api.useinvariance.com`)
 
 2. **Config file** at `~/.invariance/config.json`
    ```json
    {
      "apiKey": "inv_sk_...",
-     "baseUrl": "https://api.invariance.ai"
+     "baseUrl": "https://api.useinvariance.com"
    }
    ```
 

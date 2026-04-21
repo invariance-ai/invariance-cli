@@ -52,6 +52,18 @@ export const RunSchema = z.object({
   created_at: z.string(),
   updated_at: z.string(),
   closed_at: z.string().nullable(),
+  parent_run_id: z.string().nullable().optional(),
+  fork_point_node_id: z.string().nullable().optional(),
+  replay_seed: z.string().nullable().optional(),
+  total_input_tokens: z.number().optional(),
+  total_output_tokens: z.number().optional(),
+  total_cache_read: z.number().optional(),
+  total_cache_write: z.number().optional(),
+  total_cost_usd: z.number().optional(),
+  llm_call_count: z.number().optional(),
+  tool_call_count: z.number().optional(),
+  error_count: z.number().optional(),
+  total_latency_ms: z.number().optional(),
 });
 export type Run = z.infer<typeof RunSchema>;
 export const RunListSchema = ListSchema(RunSchema);
@@ -76,6 +88,9 @@ export const NodeSchema = z.object({
   previous_hashes: z.array(z.string()),
   signature: z.string().nullable(),
   created_at: z.string(),
+  handoff_from: z.string().nullable().optional(),
+  handoff_to: z.string().nullable().optional(),
+  handoff_reason: z.string().nullable().optional(),
 });
 export type Node = z.infer<typeof NodeSchema>;
 export const NodeListSchema = ListSchema(NodeSchema);
@@ -127,6 +142,8 @@ export const MonitorSchema = z.object({
   schedule: MonitorScheduleSchema,
   creates_review: z.boolean(),
   signal_type: z.string().nullable(),
+  scope: z.string().nullable().optional(),
+  target: z.unknown().nullable().optional(),
   last_run_at: z.string().nullable(),
   next_run_at: z.string().nullable(),
   created_at: z.string(),

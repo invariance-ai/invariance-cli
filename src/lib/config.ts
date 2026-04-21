@@ -18,7 +18,7 @@ interface ConfigFile {
 
 const CONFIG_DIR = path.join(os.homedir(), ".invariance");
 const CONFIG_FILE = path.join(CONFIG_DIR, "config.json");
-const DEFAULT_BASE_URL = "https://api.invariance.ai";
+const DEFAULT_BASE_URL = "https://api.useinvariance.com";
 
 function ensureConfigDir(): void {
   if (!fs.existsSync(CONFIG_DIR)) {

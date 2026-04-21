@@ -41,7 +41,7 @@ describe("config", () => {
   it("should use env var INVARIANCE_API_KEY over config file", async () => {
     fs.writeFileSync(
       configFile,
-      JSON.stringify({ apiKey: "file-key", baseUrl: "https://api.invariance.ai" }),
+      JSON.stringify({ apiKey: "file-key", baseUrl: "https://api.useinvariance.com" }),
     );
     process.env["INVARIANCE_API_KEY"] = "env-key";
 
@@ -70,7 +70,7 @@ describe("config", () => {
     const { resolveConfig } = await import("../lib/config.js");
     const config = resolveConfig();
 
-    expect(config.baseUrl).toBe("https://api.invariance.ai");
+    expect(config.baseUrl).toBe("https://api.useinvariance.com");
   });
 
   it("should read from named profile when specified", async () => {
