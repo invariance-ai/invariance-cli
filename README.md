@@ -17,8 +17,11 @@ pnpm add -g @invariance/cli
 ## Quick start
 
 ```bash
-# Authenticate
-invariance auth login
+# Authenticate (browser flow — opens your dashboard)
+invariance login --browser
+
+# Or paste an API key directly
+invariance login --api-key inv_live_...
 
 # Confirm identity
 invariance agent me
@@ -41,8 +44,8 @@ invariance doctor
 
 | Command | Description |
 | --- | --- |
-| `auth login` | Authenticate with the Invariance API |
-| `auth logout` | Clear stored credentials |
+| `login` / `auth login` | Authenticate with the Invariance API (browser or paste key) |
+| `logout` / `auth logout` | Clear stored credentials |
 | `auth whoami` | Display the current user |
 | `config get <key>` / `set` | Read/write a config value |
 | `run start` / `list` / `get <id>` | Start, list, inspect runs |
