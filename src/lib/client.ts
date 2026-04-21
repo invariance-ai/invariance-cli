@@ -401,10 +401,8 @@ export class InvarianceClient {
   // ── Metrics ──
 
   async metricsOverview(params: {
-    from?: string;
-    to?: string;
-    project_id?: string;
-  }): Promise<unknown> {
+    window_hours?: number;
+  } = {}): Promise<unknown> {
     return this.request("GET", "/v1/metrics/overview", { params });
   }
 }

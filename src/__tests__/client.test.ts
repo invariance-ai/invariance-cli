@@ -169,4 +169,15 @@ describe("InvarianceClient", () => {
     const sig = await c.emitSignal({ severity: "high", title: "test" });
     expect(sig.severity).toBe("high");
   });
+
+  it("metricsOverview uses window_hours query param", async () => {
+    fetchSpy.mockResolvedValueOnce(jsonResponse({ metrics: { totals: { runs: 1 } } }));
+    const c = new InvarianceClient({ apiKey: "k", baseUrl: BASE });
+    await c.metricsOverview({ window_hours: 72 });
+    const url = fetchSpy.mock.calls[0]?.[0] as string;
+    expect(url).toContain("window_hours=72");
+    expect(url).not.toContain("from=");
+    expect(url).not.toContain("to=");
+    expect(url).not.toContain("project_id=");
+  });
 });
