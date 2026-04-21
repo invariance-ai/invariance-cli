@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import type { Command } from "commander";
 import { getAuthenticatedClient } from "./auth.js";
 import { handleError } from "./errors.js";
