@@ -62,7 +62,7 @@ async function runChecks(profile?: string): Promise<CheckResult[]> {
   if (config.apiKey) {
     try {
       const client = new InvarianceClient({ apiKey: config.apiKey, baseUrl: config.baseUrl });
-      await client.whoami();
+      await client.me();
       results.push({ name: "API reachable", status: "pass", message: config.baseUrl });
     } catch (error) {
       const msg = error instanceof Error ? error.message : "Unknown error";

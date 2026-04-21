@@ -2,132 +2,171 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { InvarianceClient, buildUrl } from "../lib/client.js";
 import { AuthenticationError, NetworkError, ApiError } from "../lib/errors.js";
 
+const BASE = "https://api.useinvariance.com";
+
+function jsonResponse(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
 describe("InvarianceClient", () => {
   let fetchSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
     fetchSpy = vi.spyOn(globalThis, "fetch");
   });
-
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  it("should construct correct URL for API calls", () => {
-    expect(buildUrl("https://api.invariance.ai", "/v1/auth/whoami")).toBe(
-      "https://api.invariance.ai/v1/auth/whoami",
-    );
+  it("buildUrl strips trailing slashes", () => {
+    expect(buildUrl(BASE + "/", "/v1/runs")).toBe(`${BASE}/v1/runs`);
   });
 
-  it("should strip trailing slashes from base URL", () => {
-    expect(buildUrl("https://api.invariance.ai/", "/v1/traces")).toBe(
-      "https://api.invariance.ai/v1/traces",
-    );
-  });
-
-  it("should send Authorization header with API key", async () => {
+  it("sends Bearer auth + UA to /v1/agents/me", async () => {
     fetchSpy.mockResolvedValueOnce(
-      new Response(
-        JSON.stringify({ id: "usr_1", email: "test@example.com", name: "Test" }),
-        { status: 200, headers: { "Content-Type": "application/json" } },
-      ),
+      jsonResponse({
+        agent: {
+          id: "ag_1",
+          name: "a",
+          public_key: null,
+          project_id: "p_1",
+          created_at: "2025-01-01T00:00:00Z",
+        },
+      }),
     );
-
-    const client = new InvarianceClient({
-      apiKey: "test-key",
-      baseUrl: "https://api.invariance.ai",
-    });
-
-    await client.whoami();
-
+    const c = new InvarianceClient({ apiKey: "k", baseUrl: BASE });
+    await c.me();
     expect(fetchSpy).toHaveBeenCalledWith(
-      "https://api.invariance.ai/v1/auth/whoami",
+      `${BASE}/v1/agents/me`,
       expect.objectContaining({
+        method: "GET",
         headers: expect.objectContaining({
-          Authorization: "Bearer test-key",
+          Authorization: "Bearer k",
+          "User-Agent": "invariance-cli",
         }),
       }),
     );
   });
 
-  it("should throw AuthenticationError on 401", async () => {
-    fetchSpy.mockResolvedValueOnce(
-      new Response(JSON.stringify({ message: "Unauthorized" }), { status: 401 }),
-    );
-
-    const client = new InvarianceClient({
-      apiKey: "bad-key",
-      baseUrl: "https://api.invariance.ai",
-    });
-
-    await expect(client.whoami()).rejects.toThrow(AuthenticationError);
+  it("maps 401 to AuthenticationError", async () => {
+    fetchSpy.mockResolvedValueOnce(jsonResponse({ message: "nope" }, 401));
+    const c = new InvarianceClient({ apiKey: "bad", baseUrl: BASE });
+    await expect(c.me()).rejects.toBeInstanceOf(AuthenticationError);
   });
 
-  it("should throw ApiError on non-401/404 errors", async () => {
-    fetchSpy.mockResolvedValueOnce(
-      new Response(JSON.stringify({ message: "Rate limited" }), { status: 429 }),
-    );
-
-    const client = new InvarianceClient({
-      apiKey: "key",
-      baseUrl: "https://api.invariance.ai",
-    });
-
-    await expect(client.listTraces()).rejects.toThrow(ApiError);
+  it("maps 403 to AuthenticationError", async () => {
+    fetchSpy.mockResolvedValueOnce(jsonResponse({ message: "forbidden" }, 403));
+    const c = new InvarianceClient({ apiKey: "bad", baseUrl: BASE });
+    await expect(c.me()).rejects.toBeInstanceOf(AuthenticationError);
   });
 
-  it("should throw NetworkError on fetch failure", async () => {
+  it("maps 429 to ApiError", async () => {
+    fetchSpy.mockResolvedValueOnce(jsonResponse({ message: "rate" }, 429));
+    const c = new InvarianceClient({ apiKey: "k", baseUrl: BASE });
+    await expect(c.listRuns()).rejects.toBeInstanceOf(ApiError);
+  });
+
+  it("maps fetch TypeError to NetworkError", async () => {
     fetchSpy.mockRejectedValueOnce(new TypeError("fetch failed"));
-
-    const client = new InvarianceClient({
-      apiKey: "key",
-      baseUrl: "https://api.invariance.ai",
-    });
-
-    await expect(client.whoami()).rejects.toThrow(NetworkError);
+    const c = new InvarianceClient({ apiKey: "k", baseUrl: BASE });
+    await expect(c.me()).rejects.toBeInstanceOf(NetworkError);
   });
 
-  it("should pass query params for listTraces", async () => {
-    fetchSpy.mockResolvedValueOnce(
-      new Response(JSON.stringify({ data: [], has_more: false }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      }),
-    );
-
-    const client = new InvarianceClient({
-      apiKey: "key",
-      baseUrl: "https://api.invariance.ai",
-    });
-
-    await client.listTraces({ limit: 5, status: "completed" });
-
-    const calledUrl = fetchSpy.mock.calls[0]?.[0] as string;
-    expect(calledUrl).toContain("limit=5");
-    expect(calledUrl).toContain("status=completed");
+  it("passes cursor + limit as query params for listRuns", async () => {
+    fetchSpy.mockResolvedValueOnce(jsonResponse({ data: [], next_cursor: null }));
+    const c = new InvarianceClient({ apiKey: "k", baseUrl: BASE });
+    await c.listRuns({ cursor: "abc", limit: 5 });
+    const url = fetchSpy.mock.calls[0]?.[0] as string;
+    expect(url).toContain("cursor=abc");
+    expect(url).toContain("limit=5");
   });
 
-  it("should send POST body for query", async () => {
+  it("POSTs runs start with name + metadata body", async () => {
     fetchSpy.mockResolvedValueOnce(
-      new Response(JSON.stringify({ result: "answer" }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
+      jsonResponse({
+        run: {
+          id: "run_1",
+          agent_id: "ag_1",
+          name: "demo",
+          status: "open",
+          metadata: {},
+          created_at: "2025-01-01T00:00:00Z",
+          updated_at: "2025-01-01T00:00:00Z",
+          closed_at: null,
+        },
       }),
     );
-
-    const client = new InvarianceClient({
-      apiKey: "key",
-      baseUrl: "https://api.invariance.ai",
-    });
-
-    await client.query("test prompt");
-
+    const c = new InvarianceClient({ apiKey: "k", baseUrl: BASE });
+    const run = await c.startRun({ name: "demo", metadata: { env: "dev" } });
+    expect(run.id).toBe("run_1");
     expect(fetchSpy).toHaveBeenCalledWith(
-      expect.any(String),
+      `${BASE}/v1/runs`,
       expect.objectContaining({
         method: "POST",
-        body: JSON.stringify({ prompt: "test prompt" }),
+        body: JSON.stringify({ name: "demo", metadata: { env: "dev" } }),
       }),
     );
+  });
+
+  it("writeNodes posts array with run_id injected", async () => {
+    fetchSpy.mockResolvedValueOnce(
+      jsonResponse({
+        data: [
+          {
+            id: "node_1",
+            run_id: "run_1",
+            agent_id: "ag_1",
+            parent_id: null,
+            action_type: "tool_call",
+            type: null,
+            input: null,
+            output: null,
+            error: null,
+            metadata: {},
+            custom_fields: {},
+            timestamp: 1,
+            duration_ms: null,
+            hash: "h",
+            previous_hashes: [],
+            signature: null,
+            created_at: "2025-01-01T00:00:00Z",
+          },
+        ],
+      }),
+    );
+    const c = new InvarianceClient({ apiKey: "k", baseUrl: BASE });
+    await c.writeNodes("run_1", [{ action_type: "tool_call" }]);
+    const body = (fetchSpy.mock.calls[0]?.[1] as RequestInit).body as string;
+    expect(JSON.parse(body)).toEqual([{ run_id: "run_1", action_type: "tool_call" }]);
+  });
+
+  it("emitSignal sends Severity + title", async () => {
+    fetchSpy.mockResolvedValueOnce(
+      jsonResponse({
+        signal: {
+          id: "sig_1",
+          agent_id: "ag_1",
+          monitor_id: null,
+          monitor_execution_id: null,
+          run_id: null,
+          node_id: null,
+          source: "manual",
+          severity: "high",
+          title: "test",
+          message: null,
+          status: "open",
+          type: null,
+          data: null,
+          acknowledged_at: null,
+          created_at: "2025-01-01T00:00:00Z",
+        },
+      }),
+    );
+    const c = new InvarianceClient({ apiKey: "k", baseUrl: BASE });
+    const sig = await c.emitSignal({ severity: "high", title: "test" });
+    expect(sig.severity).toBe("high");
   });
 });

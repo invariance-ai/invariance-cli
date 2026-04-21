@@ -28,21 +28,21 @@ describe("completions", () => {
 
   it("bash completion should include all command groups", () => {
     const script = bashCompletionScript();
-    for (const cmd of ["auth", "config", "trace", "monitor", "eval", "dataset", "session"]) {
+    for (const cmd of ["auth", "config", "run", "node", "monitor", "signal", "finding", "review", "agent", "metrics"]) {
       expect(script).toContain(cmd);
     }
   });
 
   it("zsh completion should include all command groups", () => {
     const script = zshCompletionScript();
-    for (const cmd of ["auth", "config", "trace", "monitor", "eval", "dataset", "session"]) {
+    for (const cmd of ["auth", "config", "run", "node", "monitor", "signal", "finding", "review", "agent", "metrics"]) {
       expect(script).toContain(cmd);
     }
   });
 
   it("fish completion should include all command groups", () => {
     const script = fishCompletionScript();
-    for (const cmd of ["auth", "config", "trace", "monitor", "eval", "dataset", "session"]) {
+    for (const cmd of ["auth", "config", "run", "node", "monitor", "signal", "finding", "review", "agent", "metrics"]) {
       expect(script).toContain(cmd);
     }
   });
