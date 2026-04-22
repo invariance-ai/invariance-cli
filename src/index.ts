@@ -16,6 +16,7 @@ import { metricsCommand } from "./commands/metrics/index.js";
 import { doctorCommand } from "./commands/doctor.js";
 import { completionsCommand } from "./commands/completions.js";
 import { versionCommand } from "./commands/version.js";
+import { kbCommand } from "./commands/kb/index.js";
 
 const program = new Command();
 
@@ -55,6 +56,7 @@ program.addCommand(findingCommand);
 program.addCommand(reviewCommand);
 program.addCommand(agentCommand);
 program.addCommand(metricsCommand);
+program.addCommand(kbCommand);
 
 // top-level utilities
 program.addCommand(completionsCommand);

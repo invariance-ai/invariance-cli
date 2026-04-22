@@ -252,21 +252,32 @@ export const NarrativeSchema = z.object({
 });
 export type Narrative = z.infer<typeof NarrativeSchema>;
 
+// ── Context (knowledge-base / ask) config ──
+
+export const ContextConfigSchema = z.object({
+  kbPath: z.string().optional(),
+  systemPrompt: z.string().optional(),
+  docGlobs: z.array(z.string()).optional(),
+  urlAllowlist: z.array(z.string()).optional(),
+  repoPaths: z.array(z.string()).optional(),
+  model: z.string().optional(),
+});
+export type ContextConfig = z.infer<typeof ContextConfigSchema>;
+
 // ── Config file ──
+
+const ProfileEntrySchema = z.object({
+  apiKey: z.string().optional(),
+  baseUrl: z.string().url().optional(),
+  context: ContextConfigSchema.optional(),
+});
 
 export const ConfigSchema = z.object({
   apiKey: z.string().optional(),
   baseUrl: z.string().url().optional(),
   profile: z.string().optional(),
-  profiles: z
-    .record(
-      z.string(),
-      z.object({
-        apiKey: z.string().optional(),
-        baseUrl: z.string().url().optional(),
-      }),
-    )
-    .optional(),
+  profiles: z.record(z.string(), ProfileEntrySchema).optional(),
+  context: ContextConfigSchema.optional(),
 });
 export type Config = z.infer<typeof ConfigSchema>;
 
