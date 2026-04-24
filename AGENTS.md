@@ -31,7 +31,7 @@ RUN_ID=$(invariance run start --name "refactor auth middleware" --json | jq -r .
 # 2. For each tool/LLM call, write a node
 invariance node write "$RUN_ID" \
   --action-type tool_call \
-  --name "grep:auth" \
+  --metadata '{"tool":"grep","step":"auth search"}' \
   --input  '{"pattern":"verifyToken"}' \
   --output '{"matches":7}'
 
