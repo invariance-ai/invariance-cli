@@ -1,10 +1,18 @@
 name: Release
+# Publishing is disabled until the CLI is ready for public npm release.
+# Trigger this workflow manually (workflow_dispatch) with publish=true to
+# cut a release once credentials and version policy are finalized.
 on:
-  push:
-    branches: [main]
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: "Publish to npm (must be explicitly set to 'true')"
+        required: true
+        default: "false"
 concurrency: ${{ github.workflow }}-${{ github.ref }}
 jobs:
   release:
+    if: ${{ github.event.inputs.publish == 'true' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write

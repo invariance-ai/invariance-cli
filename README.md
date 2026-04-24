@@ -2,6 +2,12 @@
 
 The official command-line interface for [Invariance AI](https://invariance.ai) — monitor, trace, and query your AI systems from the terminal.
 
+Part of the Invariance SDK family:
+
+- [`@invariance/cli`](./) — command-line interface (this repo).
+- [`@invariance/sdk`](../invariance-typescript) — TypeScript SDK.
+- [`invariance-sdk`](../invariance-python) — Python SDK.
+
 ## Install
 
 ```bash
