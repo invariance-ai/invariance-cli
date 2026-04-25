@@ -78,11 +78,12 @@ describe("startLoopbackServer", () => {
 });
 
 describe("login command surface", () => {
-  it("exposes --api-key, --profile, --browser", () => {
+  it("exposes --api-key, --profile, --browser, --paste", () => {
     const flags = loginCommand.options.map((o) => o.long);
     expect(flags).toContain("--api-key");
     expect(flags).toContain("--profile");
     expect(flags).toContain("--browser");
+    expect(flags).toContain("--paste");
   });
 
   it("makeLoginCommand produces a fresh Command with the same options", () => {

@@ -56,14 +56,13 @@ export function dashboardBaseUrl(apiBaseUrl: string): string {
 
 function openBrowser(url: string): void {
   const platform = process.platform;
-  const cmd =
-    platform === "darwin" ? "open" : platform === "win32" ? "start" : "xdg-open";
-  const args = platform === "win32" ? ["", url] : [url];
-  const child = spawn(cmd, args, {
-    detached: true,
-    stdio: "ignore",
-    shell: platform === "win32",
-  });
+  const child =
+    platform === "win32"
+      ? spawn("cmd.exe", ["/c", "start", "", url], { detached: true, stdio: "ignore" })
+      : spawn(platform === "darwin" ? "open" : "xdg-open", [url], {
+          detached: true,
+          stdio: "ignore",
+        });
   child.unref();
 }
 
@@ -95,7 +94,12 @@ export function startLoopbackServer(expectedState: string): Promise<LoopbackServ
         if (error) {
           res.end(renderHtml("Login cancelled", "You can close this tab and return to the terminal."));
         } else if (!token || state !== expectedState) {
-          res.end(renderHtml("Login failed", "State mismatch — please try again."));
+          res.end(
+            renderHtml(
+              "Login failed",
+              "Please re-run `invariance login` in your terminal.",
+            ),
+          );
         } else {
           res.end(
             renderHtml(
@@ -112,11 +116,24 @@ export function startLoopbackServer(expectedState: string): Promise<LoopbackServ
       }
     });
 
-    server.on("error", reject);
+    server.on("error", (err: NodeJS.ErrnoException) => {
+      reject(
+        new Error(
+          `Could not start the local callback server${err.code ? ` (${err.code})` : ""}. ` +
+            `Another process may be using loopback ports. ` +
+            `Try \`invariance login --paste\` to paste an API key instead.`,
+        ),
+      );
+    });
     server.listen(0, "127.0.0.1", () => {
       const addr = server.address();
       if (!addr || typeof addr === "string") {
-        reject(new Error("Failed to bind loopback server"));
+        reject(
+          new Error(
+            "Could not start the local callback server. " +
+              "Try `invariance login --paste` to paste an API key instead.",
+          ),
+        );
         return;
       }
       resolve({
@@ -162,22 +179,25 @@ async function browserLogin(opts: { apiBaseUrl: string; openBrowser: boolean }):
   const spinner = ora("Waiting for approval in your browser...").start();
   let timer: NodeJS.Timeout | undefined;
   const timeout = new Promise<LoopbackResult>((_, reject) => {
-    timer = setTimeout(
-      () => reject(new Error("Timed out waiting for browser approval (2 minutes).")),
-      APPROVE_TIMEOUT_MS,
-    );
+    timer = setTimeout(() => reject(new Error("__timeout__")), APPROVE_TIMEOUT_MS);
   });
   try {
     const r = await Promise.race([result, timeout]);
     if (timer) clearTimeout(timer);
     close();
     if (r.error) {
-      spinner.fail("Login cancelled.");
-      throw new Error("Login cancelled.");
+      spinner.fail(`Login cancelled (${r.error}).`);
+      throw new Error(
+        `Login cancelled in browser${r.error ? `: ${r.error}` : ""}. Run \`invariance login\` to try again.`,
+      );
     }
     if (!r.token || r.state !== state) {
-      spinner.fail("Login failed: state mismatch.");
-      throw new Error("State mismatch — possible CSRF. No token was saved.");
+      spinner.fail("Login failed.");
+      throw new Error(
+        "The sign-in response didn't match this terminal session. " +
+          "This can happen if you clicked an old sign-in link. " +
+          "Run `invariance login` again to start a fresh session.",
+      );
     }
     spinner.succeed("Approved in browser.");
     return r.token;
@@ -185,6 +205,14 @@ async function browserLogin(opts: { apiBaseUrl: string; openBrowser: boolean }):
     if (timer) clearTimeout(timer);
     close();
     spinner.stop();
+    if (e instanceof Error && e.message === "__timeout__") {
+      throw new Error(
+        `Timed out waiting for browser approval after 2 minutes.\n` +
+          `  Sign-in URL: ${pretty}\n` +
+          `  Try again:  invariance login\n` +
+          `  Or paste a key: invariance login --paste`,
+      );
+    }
     throw e;
   }
 }
@@ -193,23 +221,69 @@ type LoginOptions = {
   apiKey?: string;
   profile?: string;
   browser?: boolean;
+  paste?: boolean;
   open?: boolean;
 };
+
+const MAX_PASTE_ATTEMPTS = 3;
+
+async function pasteLoginWithRetries(baseUrl: string): Promise<string> {
+  let lastError: string | undefined;
+  for (let attempt = 1; attempt <= MAX_PASTE_ATTEMPTS; attempt++) {
+    const apiKey = await promptForApiKey();
+    if (!apiKey) {
+      console.error(
+        chalk.yellow(
+          `API key cannot be empty. (${MAX_PASTE_ATTEMPTS - attempt} attempt${
+            MAX_PASTE_ATTEMPTS - attempt === 1 ? "" : "s"
+          } left)`,
+        ),
+      );
+      lastError = "empty key";
+      continue;
+    }
+    const spinner = ora("Validating API key...").start();
+    const result = await validateApiKey(apiKey, baseUrl);
+    if (result.valid) {
+      spinner.succeed("API key is valid.");
+      return apiKey;
+    }
+    spinner.fail(`Validation failed: ${result.error}`);
+    lastError = result.error;
+    if (attempt < MAX_PASTE_ATTEMPTS) {
+      console.error(
+        chalk.dim(
+          `(${MAX_PASTE_ATTEMPTS - attempt} attempt${
+            MAX_PASTE_ATTEMPTS - attempt === 1 ? "" : "s"
+          } left)`,
+        ),
+      );
+    }
+  }
+  throw new Error(
+    `Could not validate an API key after ${MAX_PASTE_ATTEMPTS} attempts` +
+      (lastError ? ` (last error: ${lastError})` : "") +
+      `.\n  Get or rotate a key at: ${dashboardBaseUrl(baseUrl)}/settings/api-keys`,
+  );
+}
 
 async function runLogin(options: LoginOptions): Promise<void> {
   try {
     const config = resolveConfig(options.profile);
     let apiKey: string;
+    let alreadyValidated = false;
 
     if (options.apiKey) {
       apiKey = options.apiKey;
-    } else if (options.browser) {
+    } else if (options.paste) {
+      apiKey = await pasteLoginWithRetries(config.baseUrl);
+      alreadyValidated = true;
+    } else {
+      // Default: browser flow. --browser is kept as an explicit alias.
       apiKey = await browserLogin({
         apiBaseUrl: config.baseUrl,
         openBrowser: options.open !== false,
       });
-    } else {
-      apiKey = await promptForApiKey();
     }
 
     if (!apiKey) {
@@ -217,13 +291,15 @@ async function runLogin(options: LoginOptions): Promise<void> {
       process.exit(1);
     }
 
-    const spinner = ora("Validating API key...").start();
-    const result = await validateApiKey(apiKey, config.baseUrl);
-    if (!result.valid) {
-      spinner.fail(`Validation failed: ${result.error}`);
-      process.exit(1);
+    if (!alreadyValidated) {
+      const spinner = ora("Validating API key...").start();
+      const result = await validateApiKey(apiKey, config.baseUrl);
+      if (!result.valid) {
+        spinner.fail(`Validation failed: ${result.error}`);
+        process.exit(1);
+      }
+      spinner.succeed("API key is valid.");
     }
-    spinner.succeed("API key is valid.");
 
     saveApiKey(apiKey, options.profile);
 
@@ -235,9 +311,9 @@ async function runLogin(options: LoginOptions): Promise<void> {
 
     console.error("");
     console.error(chalk.bold("Next steps:"));
+    console.error("  " + chalk.cyan("invariance doctor") + "          Verify your setup works end-to-end");
     console.error("  " + chalk.cyan("invariance agent me") + "        Show who you're signed in as");
     console.error("  " + chalk.cyan("invariance run start --name demo") + "   Start a run");
-    console.error("  " + chalk.cyan("invariance doctor") + "          Check your setup");
   } catch (error) {
     handleError(error);
   }
@@ -245,23 +321,24 @@ async function runLogin(options: LoginOptions): Promise<void> {
 
 export function makeLoginCommand(name: string): Command {
   return new Command(name)
-    .description("Authenticate with the Invariance API")
-    .option("--api-key <key>", "Paste an API key directly")
+    .description("Authenticate with the Invariance API (opens your browser by default)")
+    .option("--api-key <key>", "Pass an API key non-interactively")
     .option("--profile <name>", "Save credentials to a named profile")
-    .option("--browser", "Open the browser to sign in (requires dashboard /cli/auth)")
-    .option("--no-open", "With --browser, print the URL instead of auto-opening")
+    .option("--browser", "Use the browser flow (this is the default)")
+    .option("--paste", "Paste an API key at a terminal prompt (for headless/SSH)")
+    .option("--no-open", "Print the sign-in URL instead of auto-opening the browser")
     .addHelpText(
       "after",
       `
 Examples:
-  $ invariance login
-  $ invariance login --browser
-  $ invariance login --profile staging
-  $ invariance login --api-key inv_live_...
+  $ invariance login                       # browser flow (default)
+  $ invariance login --paste               # paste a key at a prompt (SSH / headless)
+  $ invariance login --profile staging     # save under a named profile
+  $ invariance login --api-key inv_live_...# non-interactive, e.g. CI
 
 The browser flow opens your dashboard, where you approve this device and
 the key is returned to a loopback listener (http://127.0.0.1:<random port>).
-Falls back to a paste prompt when --browser is not set.`,
+Use --paste if you can't open a browser (e.g. SSH without port-forwarding).`,
     )
     .action((options: LoginOptions) => runLogin(options));
 }

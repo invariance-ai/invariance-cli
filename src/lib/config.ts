@@ -38,16 +38,26 @@ function readConfigFile(): ConfigFile {
     return validated as ConfigFile;
   } catch {
     throw new ConfigError(
-      `Invalid config file at ${CONFIG_FILE}. Delete it and run \`invariance auth login\`.`,
+      `Your config file at ${CONFIG_FILE} is invalid. Run \`invariance auth logout\` to reset it, then \`invariance login\` to re-authenticate.`,
     );
   }
 }
 
 function writeConfigFile(config: ConfigFile): void {
   ensureConfigDir();
-  fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2) + "\n", {
-    mode: 0o600,
-  });
+  const payload = JSON.stringify(config, null, 2) + "\n";
+  const tmp = `${CONFIG_FILE}.${process.pid}.${Date.now()}.tmp`;
+  fs.writeFileSync(tmp, payload, { mode: 0o600 });
+  try {
+    fs.renameSync(tmp, CONFIG_FILE);
+  } catch (err) {
+    try {
+      fs.unlinkSync(tmp);
+    } catch {
+      // best-effort cleanup
+    }
+    throw err;
+  }
 }
 
 export function getConfigPath(): string {
@@ -149,11 +159,16 @@ export function setConfigValue(key: string, value: string): void {
 }
 
 export function clearConfig(): void {
-  if (fs.existsSync(CONFIG_FILE)) {
-    const config = readConfigFile();
-    delete config.apiKey;
-    writeConfigFile(config);
+  if (!fs.existsSync(CONFIG_FILE)) return;
+  let config: ConfigFile;
+  try {
+    config = readConfigFile();
+  } catch {
+    // Corrupt file — reset to a clean empty config rather than erroring.
+    config = {};
   }
+  delete config.apiKey;
+  writeConfigFile(config);
 }
 
 export function isConfigValid(): boolean {

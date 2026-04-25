@@ -5,8 +5,8 @@ The official command-line interface for [Invariance AI](https://invariance.ai) �
 Part of the Invariance SDK family:
 
 - [`@invariance/cli`](./) — command-line interface (this repo).
-- [`@invariance/sdk`](../invariance-typescript) — TypeScript SDK.
-- [`invariance-sdk`](../invariance-python) — Python SDK.
+- [`@invariance/sdk`](https://github.com/invariance-ai/invariance-typescript) — TypeScript SDK.
+- [`invariance-sdk`](https://github.com/invariance-ai/invariance-python) — Python SDK.
 
 ## Install
 
