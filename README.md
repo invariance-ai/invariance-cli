@@ -37,6 +37,10 @@ RUN=$(invariance run start --name demo --json | jq -r .id)
 invariance node write "$RUN" --action-type tool_call --input '{"x":1}' --output '{"y":2}'
 invariance run verify "$RUN"
 
+# Stream nodes, or fetch one page for scripts/smoke tests
+invariance node tail "$RUN"
+invariance node tail "$RUN" --once --json
+
 # Monitors, signals, reviews
 invariance monitor list
 invariance signal list
