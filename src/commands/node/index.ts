@@ -82,22 +82,29 @@ nodeCommand.addCommand(
     new Command("tail")
       .description("Poll a run for new nodes and stream them as they arrive")
       .argument("<run_id>")
-      .option("--interval <ms>", "Poll interval (ms)", parseIntFlag, 2000),
+      .option("--interval <ms>", "Poll interval (ms)", parseIntFlag, 2000)
+      .option("--once", "Fetch one page and exit"),
     async ({ client, globals, opts, cmd }) => {
       const runId = cmd.args[0]!;
       let cursor: string | undefined;
       let stopped = false;
-      process.on("SIGINT", () => {
+      const onSigint = () => {
         stopped = true;
-      });
-      while (!stopped) {
-        const page = await client.listRunNodes(runId, { cursor });
-        for (const n of page.data) printValue(n, globals);
-        if (page.next_cursor) {
-          cursor = page.next_cursor;
-          continue;
+      };
+      process.once("SIGINT", onSigint);
+      try {
+        while (!stopped) {
+          const page = await client.listRunNodes(runId, { cursor });
+          for (const n of page.data) printValue(n, globals);
+          if (opts.once) break;
+          if (page.next_cursor) {
+            cursor = page.next_cursor;
+            continue;
+          }
+          await new Promise((r) => setTimeout(r, opts.interval));
         }
-        await new Promise((r) => setTimeout(r, opts.interval));
+      } finally {
+        process.off("SIGINT", onSigint);
       }
     },
   ) as Command,
