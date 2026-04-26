@@ -61,6 +61,30 @@ export function printPage(
 }
 
 export function printValue(value: unknown, globals: GlobalOptions): void {
-  formatOutput(value, { json: true });
-  void globals;
+  if (globals.json) {
+    process.stdout.write(JSON.stringify(value) + "\n");
+    return;
+  }
+  if (
+    value !== null &&
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    "id" in (value as Record<string, unknown>)
+  ) {
+    const obj = value as Record<string, unknown>;
+    const keys = ["id", ...Object.keys(obj).filter((k) => k !== "id")];
+    const maxKeyLen = Math.max(...keys.map((k) => k.length));
+    for (const key of keys) {
+      const v = obj[key];
+      const rendered =
+        v === null || v === undefined
+          ? ""
+          : typeof v === "object"
+            ? JSON.stringify(v)
+            : String(v);
+      process.stdout.write(`${key.padEnd(maxKeyLen)}  ${rendered}\n`);
+    }
+    return;
+  }
+  process.stdout.write(JSON.stringify(value, null, 2) + "\n");
 }

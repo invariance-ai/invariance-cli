@@ -298,9 +298,27 @@ export class InvarianceClient {
     return SignalSchema.parse(res.signal);
   }
 
-  async listSignals(opts: PageOptions = {}): Promise<Page<Signal>> {
+  async listSignals(
+    opts: PageOptions & {
+      status?: string;
+      severity?: string;
+      run_id?: string;
+      monitor_id?: string;
+      node_id?: string;
+      source?: string;
+    } = {},
+  ): Promise<Page<Signal>> {
     return this.parsed(SignalListSchema, "GET", "/v1/signals", {
-      params: { cursor: opts.cursor, limit: opts.limit },
+      params: {
+        cursor: opts.cursor,
+        limit: opts.limit,
+        status: opts.status,
+        severity: opts.severity,
+        run_id: opts.run_id,
+        monitor_id: opts.monitor_id,
+        node_id: opts.node_id,
+        source: opts.source,
+      },
     });
   }
 
