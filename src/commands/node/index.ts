@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import { Command } from "commander";
 import { action, parseIntFlag, parseJsonFlag, printPage, printValue } from "../../lib/cmd.js";
+import { paginate } from "../../lib/paginate.js";
 
 const NODE_COLUMNS = [
   { key: "id", label: "ID", width: 20 },
@@ -14,15 +15,24 @@ export const nodeCommand = new Command("node").description("Manage nodes (execut
 nodeCommand.addCommand(
   action(
     new Command("write")
-      .description("Write one or more nodes to a run")
+      .description(
+        "Write one or more nodes to a run. Output (--json): array of {id, run_id, agent_id, parent_id, action_type, type, input, output, error, metadata, timestamp, duration_ms, hash, signature, created_at, ...}",
+      )
       .argument("<run_id>")
-      .option("--action-type <type>", "Action type (required unless --file)")
+      .option(
+        "--action-type <type>",
+        "Action type (required unless --file). Open string; canonical values: tool_call, llm_call, decision, sub_agent_spawn, constraint_check, plan_revision (any other string is allowed and rendered with a fallback style)",
+      )
       .option("--type <type>", "Declared node type")
       .option("--input <json>", "Input JSON")
       .option("--output <json>", "Output JSON")
       .option("--error <json>", "Error JSON")
       .option("--metadata <json>", "Metadata JSON")
-      .option("--file <path>", "JSONL file with one node per line (batched 100)"),
+      .option("--file <path>", "JSONL file with one node per line (batched 100)")
+      .addHelpText(
+        "after",
+        "\nExample:\n  $ invariance node write run_abc --action-type tool_call --input '{\"name\":\"search\",\"args\":{\"q\":\"x\"}}' --output '{\"results\":[]}'\n",
+      ),
     async ({ client, globals, opts, cmd }) => {
       const runId = cmd.args[0]!;
       let events: Record<string, unknown>[];
@@ -65,12 +75,22 @@ nodeCommand.addCommand(
 nodeCommand.addCommand(
   action(
     new Command("list")
-      .description("List nodes for a run")
+      .description(
+        "List nodes for a run. Output (--json): {data: Node[], next_cursor} where Node = {id, run_id, agent_id, parent_id, action_type, type, input, output, error, metadata, timestamp, duration_ms, hash, signature, created_at, ...}",
+      )
       .argument("<run_id>")
       .option("--limit <n>", "Page size", parseIntFlag)
-      .option("--cursor <c>", "Pagination cursor"),
+      .option("--cursor <c>", "opaque pagination token from previous response's next_cursor")
+      .option("--all", "Cursor-walk every page and emit a single combined result"),
     async ({ client, globals, opts, cmd }) => {
       const runId = cmd.args[0]!;
+      if (opts.all) {
+        const data = await paginate((cursor) =>
+          client.listRunNodes(runId, { cursor, limit: opts.limit }),
+        );
+        printPage({ data }, NODE_COLUMNS, globals);
+        return;
+      }
       const page = await client.listRunNodes(runId, { cursor: opts.cursor, limit: opts.limit });
       printPage(page, NODE_COLUMNS, globals);
     },
@@ -80,7 +100,9 @@ nodeCommand.addCommand(
 nodeCommand.addCommand(
   action(
     new Command("tail")
-      .description("Poll a run for new nodes and stream them as they arrive")
+      .description(
+        "Poll a run for new nodes and stream them as they arrive. Output (--json): one Node per line — {id, run_id, action_type, type, input, output, error, metadata, timestamp, ...}",
+      )
       .argument("<run_id>")
       .option("--interval <ms>", "Poll interval (ms)", parseIntFlag, 2000)
       .option("--once", "Fetch one page and exit"),

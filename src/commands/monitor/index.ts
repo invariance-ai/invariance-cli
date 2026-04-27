@@ -20,9 +20,15 @@ export const monitorCommand = new Command("monitor").description("Manage monitor
 monitorCommand.addCommand(
   action(
     new Command("create")
-      .description("Create a monitor")
+      .description(
+        "Create a monitor. Output (--json): {id, agent_id, name, description, enabled, evaluator, severity, schedule, creates_review, signal_type, last_run_at, next_run_at, created_at, updated_at, ...}",
+      )
       .option("--file <path>", "JSON file with CreateMonitorRequest body")
-      .option("--spec <json>", "Inline JSON body"),
+      .option("--spec <json>", "Inline JSON body")
+      .addHelpText(
+        "after",
+        "\nExample:\n  $ invariance monitor create --spec '{\"name\":\"high-cost-llm\",\"severity\":\"high\",\"evaluator\":{\"kind\":\"filter\",\"on\":{\"node\":{\"action_type\":\"llm_call\"}}},\"schedule\":{\"kind\":\"on_event\"}}'\n",
+      ),
     async ({ client, globals, opts }) => {
       const body = await readBody(opts);
       printValue(await client.createMonitor(body), globals);
@@ -33,12 +39,30 @@ monitorCommand.addCommand(
 monitorCommand.addCommand(
   action(
     new Command("list")
-      .description("List monitors")
+      .description(
+        "List monitors. Output (--json): {data: Monitor[], next_cursor} where Monitor = {id, agent_id, name, enabled, severity, evaluator, schedule, creates_review, last_run_at, next_run_at, ...}",
+      )
       .option("--limit <n>", "Page size", parseIntFlag)
-      .option("--cursor <c>", "Pagination cursor"),
+      .option("--cursor <c>", "opaque pagination token from previous response's next_cursor")
+      // NOTE: --enabled / --disabled / --severity are applied client-side.
+      // The /v1/monitors route does not accept these as query params today
+      // (future API gap).
+      .option("--enabled", "Only show enabled monitors")
+      .option("--disabled", "Only show disabled monitors")
+      .option("--severity <sev>", "Filter by severity"),
     async ({ client, globals, opts }) => {
+      const page = await client.listMonitors({ cursor: opts.cursor, limit: opts.limit });
+      const filtered = {
+        ...page,
+        data: page.data.filter((m) => {
+          if (opts.enabled && !m.enabled) return false;
+          if (opts.disabled && m.enabled) return false;
+          if (opts.severity && m.severity !== opts.severity) return false;
+          return true;
+        }),
+      };
       printPage(
-        await client.listMonitors({ cursor: opts.cursor, limit: opts.limit }),
+        filtered,
         MONITOR_COLUMNS,
         globals,
       );
@@ -47,15 +71,24 @@ monitorCommand.addCommand(
 );
 
 monitorCommand.addCommand(
-  action(new Command("get").description("Show a monitor").argument("<id>"), async ({ client, globals, cmd }) => {
-    printValue(await client.getMonitor(cmd.args[0]!), globals);
-  }) as Command,
+  action(
+    new Command("get")
+      .description(
+        "Show a monitor. Output (--json): {id, agent_id, name, description, enabled, evaluator, severity, schedule, creates_review, signal_type, last_run_at, next_run_at, created_at, updated_at, ...}",
+      )
+      .argument("<id>"),
+    async ({ client, globals, cmd }) => {
+      printValue(await client.getMonitor(cmd.args[0]!), globals);
+    },
+  ) as Command,
 );
 
 monitorCommand.addCommand(
   action(
     new Command("update")
-      .description("Update a monitor")
+      .description(
+        "Update a monitor. Output (--json): the updated Monitor = {id, name, enabled, evaluator, severity, schedule, ..., updated_at}",
+      )
       .argument("<id>")
       .option("--file <path>", "JSON file with patch body")
       .option("--patch <json>", "Inline JSON patch body")
@@ -72,21 +105,37 @@ monitorCommand.addCommand(
 );
 
 monitorCommand.addCommand(
-  action(new Command("pause").description("Disable a monitor").argument("<id>"), async ({ client, globals, cmd }) => {
-    printValue(await client.updateMonitor(cmd.args[0]!, { enabled: false }), globals);
-  }) as Command,
+  action(
+    new Command("pause")
+      .description(
+        "Disable a monitor. Output (--json): the updated Monitor = {id, enabled: false, ...}",
+      )
+      .argument("<id>"),
+    async ({ client, globals, cmd }) => {
+      printValue(await client.updateMonitor(cmd.args[0]!, { enabled: false }), globals);
+    },
+  ) as Command,
 );
 
 monitorCommand.addCommand(
-  action(new Command("resume").description("Enable a monitor").argument("<id>"), async ({ client, globals, cmd }) => {
-    printValue(await client.updateMonitor(cmd.args[0]!, { enabled: true }), globals);
-  }) as Command,
+  action(
+    new Command("resume")
+      .description(
+        "Enable a monitor. Output (--json): the updated Monitor = {id, enabled: true, ...}",
+      )
+      .argument("<id>"),
+    async ({ client, globals, cmd }) => {
+      printValue(await client.updateMonitor(cmd.args[0]!, { enabled: true }), globals);
+    },
+  ) as Command,
 );
 
 monitorCommand.addCommand(
   action(
     new Command("evaluate")
-      .description("Manually trigger monitor evaluation")
+      .description(
+        "Manually trigger monitor evaluation. Output (--json): MonitorExecution = {id, monitor_id, status: 'running'|'passed'|'failed'|'error'|'skipped', trigger: 'manual', matched_node_ids, started_at, finished_at, error, matched_count, ...}",
+      )
       .argument("<id>")
       .option("--run-id <run>", "Scope to a run")
       .option("--since <iso>", "ISO lower bound")
@@ -107,10 +156,12 @@ monitorCommand.addCommand(
 monitorCommand.addCommand(
   action(
     new Command("executions")
-      .description("List executions for a monitor")
+      .description(
+        "List executions for a monitor. Output (--json): {data: MonitorExecution[], next_cursor} where MonitorExecution = {id, monitor_id, status, trigger, matched_node_ids, started_at, finished_at, error, matched_count, ...}",
+      )
       .argument("<id>")
       .option("--limit <n>", "Page size", parseIntFlag)
-      .option("--cursor <c>", "Cursor"),
+      .option("--cursor <c>", "opaque pagination token from previous response's next_cursor"),
     async ({ client, globals, opts, cmd }) => {
       const page = await client.monitorExecutions(cmd.args[0]!, {
         cursor: opts.cursor,
@@ -133,10 +184,12 @@ monitorCommand.addCommand(
 monitorCommand.addCommand(
   action(
     new Command("findings")
-      .description("List findings produced by a monitor")
+      .description(
+        "List findings produced by a monitor. Output (--json): {data: Finding[], next_cursor} where Finding = {id, agent_id, monitor_id, signal_id, run_id, node_id, severity, title, summary, status: 'open'|'review_requested'|'resolved'|'dismissed', created_at, updated_at, ...}",
+      )
       .argument("<id>")
       .option("--limit <n>", "Page size", parseIntFlag)
-      .option("--cursor <c>", "Cursor"),
+      .option("--cursor <c>", "opaque pagination token from previous response's next_cursor"),
     async ({ client, globals, opts, cmd }) => {
       const page = await client.monitorFindings(cmd.args[0]!, {
         cursor: opts.cursor,
