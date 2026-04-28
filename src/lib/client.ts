@@ -258,6 +258,10 @@ export class InvarianceClient {
     return MonitorSchema.parse(res.monitor);
   }
 
+  async deleteMonitor(id: string): Promise<void> {
+    await this.request<void>("DELETE", `/v1/monitors/${encodeURIComponent(id)}`);
+  }
+
   async evaluateMonitor(
     id: string,
     body: { run_id?: string; since?: string; limit?: number },

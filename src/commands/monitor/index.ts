@@ -1,6 +1,18 @@
 import fs from "node:fs/promises";
+import readline from "node:readline";
 import { Command } from "commander";
 import { action, parseIntFlag, parseJsonFlag, printPage, printValue } from "../../lib/cmd.js";
+
+async function confirm(question: string): Promise<boolean> {
+  if (!process.stdin.isTTY) return false;
+  const rl = readline.createInterface({ input: process.stdin, output: process.stderr });
+  try {
+    const answer = await new Promise<string>((resolve) => rl.question(question, resolve));
+    return /^y(es)?$/i.test(answer.trim());
+  } finally {
+    rl.close();
+  }
+}
 
 const MONITOR_COLUMNS = [
   { key: "id", label: "ID", width: 26 },
@@ -177,6 +189,30 @@ monitorCommand.addCommand(
         ],
         globals,
       );
+    },
+  ) as Command,
+);
+
+monitorCommand.addCommand(
+  action(
+    new Command("delete")
+      .description(
+        "Delete (archive) a monitor. Existing findings, signals, and reviews remain queryable but the monitor stops evaluating. Prompts for confirmation unless --yes is passed.",
+      )
+      .argument("<id>")
+      .option("-y, --yes", "Skip confirmation prompt")
+      .addHelpText("after", "\nExample:\n  $ invariance monitor delete monitor_123 --yes\n"),
+    async ({ client, globals, opts, cmd }) => {
+      const id = cmd.args[0]!;
+      if (!opts.yes) {
+        const ok = await confirm(`Delete monitor ${id}? [y/N] `);
+        if (!ok) {
+          if (!globals.json) process.stderr.write("Cancelled.\n");
+          return;
+        }
+      }
+      await client.deleteMonitor(id);
+      printValue({ id, deleted: true }, globals);
     },
   ) as Command,
 );

@@ -5,7 +5,7 @@ export const COMMANDS: Record<string, string[]> = {
   config: ["get", "set"],
   run: ["start", "list", "get", "update", "cancel", "fork", "metrics", "verify", "narrative", "llm-calls", "nodes", "inspect"],
   node: ["write", "list", "tail"],
-  monitor: ["create", "list", "get", "update", "pause", "resume", "evaluate", "executions", "findings"],
+  monitor: ["create", "list", "get", "update", "pause", "resume", "delete", "evaluate", "executions", "findings"],
   signal: ["emit", "list", "get", "ack", "resolve"],
   finding: ["list", "get", "update"],
   review: ["list", "get", "claim", "unclaim", "resolve"],
