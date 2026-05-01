@@ -71,9 +71,19 @@ export function getConfigDir(): string {
 /**
  * Resolve a config value with priority: env vars > profile config > root config > default
  */
+let warnedDeprecatedBaseUrl = false;
+
 export function resolveConfig(profile?: string): { apiKey?: string; baseUrl: string } {
   const envApiKey = process.env["INVARIANCE_API_KEY"];
-  const envBaseUrl = process.env["INVARIANCE_BASE_URL"];
+  const envApiUrl = process.env["INVARIANCE_API_URL"];
+  const envLegacyBaseUrl = process.env["INVARIANCE_BASE_URL"];
+  if (envLegacyBaseUrl && !envApiUrl && !warnedDeprecatedBaseUrl) {
+    warnedDeprecatedBaseUrl = true;
+    process.stderr.write(
+      "warning: INVARIANCE_BASE_URL is deprecated; use INVARIANCE_API_URL instead.\n",
+    );
+  }
+  const envBaseUrl = envApiUrl ?? envLegacyBaseUrl;
 
   const fileConfig = readConfigFile();
 

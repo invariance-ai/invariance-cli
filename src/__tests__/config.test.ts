@@ -31,6 +31,7 @@ describe("config", () => {
 
     // Clear env vars
     delete process.env["INVARIANCE_API_KEY"];
+    delete process.env["INVARIANCE_API_URL"];
     delete process.env["INVARIANCE_BASE_URL"];
   });
 
@@ -51,17 +52,40 @@ describe("config", () => {
     expect(config.apiKey).toBe("env-key");
   });
 
-  it("should use env var INVARIANCE_BASE_URL over config file", async () => {
+  it("should use env var INVARIANCE_API_URL over config file", async () => {
     fs.writeFileSync(
       configFile,
       JSON.stringify({ baseUrl: "https://file.example.com" }),
     );
-    process.env["INVARIANCE_BASE_URL"] = "https://env.example.com";
+    process.env["INVARIANCE_API_URL"] = "https://env.example.com";
 
     const { resolveConfig } = await import("../lib/config.js");
     const config = resolveConfig();
 
     expect(config.baseUrl).toBe("https://env.example.com");
+  });
+
+  it("should fall back to deprecated INVARIANCE_BASE_URL when INVARIANCE_API_URL is unset", async () => {
+    fs.writeFileSync(
+      configFile,
+      JSON.stringify({ baseUrl: "https://file.example.com" }),
+    );
+    process.env["INVARIANCE_BASE_URL"] = "https://legacy.example.com";
+
+    const { resolveConfig } = await import("../lib/config.js");
+    const config = resolveConfig();
+
+    expect(config.baseUrl).toBe("https://legacy.example.com");
+  });
+
+  it("should prefer INVARIANCE_API_URL over INVARIANCE_BASE_URL when both are set", async () => {
+    process.env["INVARIANCE_API_URL"] = "https://new.example.com";
+    process.env["INVARIANCE_BASE_URL"] = "https://legacy.example.com";
+
+    const { resolveConfig } = await import("../lib/config.js");
+    const config = resolveConfig();
+
+    expect(config.baseUrl).toBe("https://new.example.com");
   });
 
   it("should use default baseUrl when nothing is configured", async () => {
