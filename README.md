@@ -83,7 +83,7 @@ The CLI reads configuration from (highest priority first):
 
 1. **Environment variables**
    - `INVARIANCE_API_KEY` — API key
-   - `INVARIANCE_BASE_URL` — API base URL (default: `https://api.useinvariance.com`)
+   - `INVARIANCE_API_URL` — API base URL (default: `https://api.useinvariance.com`; deprecated alias: `INVARIANCE_BASE_URL`)
 
 2. **Config file** at `~/.invariance/config.json`
    ```json
