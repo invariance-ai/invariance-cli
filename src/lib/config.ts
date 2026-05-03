@@ -73,10 +73,15 @@ export function getConfigDir(): string {
  */
 let warnedDeprecatedBaseUrl = false;
 
-export function resolveConfig(profile?: string): { apiKey?: string; baseUrl: string } {
+export function resolveConfig(profile?: string): {
+  apiKey?: string;
+  baseUrl: string;
+  signingKey?: string;
+} {
   const envApiKey = process.env["INVARIANCE_API_KEY"];
   const envApiUrl = process.env["INVARIANCE_API_URL"];
   const envLegacyBaseUrl = process.env["INVARIANCE_BASE_URL"];
+  const envSigningKey = process.env["INVARIANCE_SIGNING_KEY"];
   if (envLegacyBaseUrl && !envApiUrl && !warnedDeprecatedBaseUrl) {
     warnedDeprecatedBaseUrl = true;
     process.stderr.write(
@@ -98,6 +103,10 @@ export function resolveConfig(profile?: string): { apiKey?: string; baseUrl: str
   return {
     apiKey: envApiKey ?? profileConfig?.apiKey ?? fileConfig.apiKey,
     baseUrl: envBaseUrl ?? profileConfig?.baseUrl ?? fileConfig.baseUrl ?? DEFAULT_BASE_URL,
+    // Ed25519 private key (64 hex chars). When present, the CLI signs every
+    // run-create and node write with it — required once an agent has a
+    // registered public_key. Env-only; never persisted to disk.
+    signingKey: envSigningKey,
   };
 }
 

@@ -15,6 +15,7 @@ export function getAuthenticatedClient(profile?: string): InvarianceClient {
   return new InvarianceClient({
     apiKey: config.apiKey,
     baseUrl: config.baseUrl,
+    signingKey: config.signingKey,
   });
 }
 
