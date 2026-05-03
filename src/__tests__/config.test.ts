@@ -166,4 +166,12 @@ describe("config", () => {
 
     expect(() => resolveConfig("nonexistent")).toThrow("Profile 'nonexistent' not found");
   });
+
+  it("should throw when the configured default profile is missing", async () => {
+    fs.writeFileSync(configFile, JSON.stringify({ profile: "staging" }));
+
+    const { resolveConfig } = await import("../lib/config.js");
+
+    expect(() => resolveConfig()).toThrow("Profile 'staging' not found");
+  });
 });

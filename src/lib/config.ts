@@ -90,8 +90,8 @@ export function resolveConfig(profile?: string): { apiKey?: string; baseUrl: str
   const selectedProfile = profile ?? fileConfig.profile;
 
   let profileConfig: ProfileConfig | undefined;
-  if (selectedProfile && fileConfig.profiles) {
-    profileConfig = fileConfig.profiles[selectedProfile];
+  if (selectedProfile) {
+    profileConfig = fileConfig.profiles?.[selectedProfile];
     if (!profileConfig) {
       throw new ConfigError(`Profile '${selectedProfile}' not found in config.`);
     }
