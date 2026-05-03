@@ -118,11 +118,60 @@ describe("config", () => {
     expect(config.baseUrl).toBe("https://staging.invariance.ai");
   });
 
+  it("should use the configured default profile when no profile flag is provided", async () => {
+    fs.writeFileSync(
+      configFile,
+      JSON.stringify({
+        apiKey: "default-key",
+        profile: "staging",
+        profiles: {
+          staging: {
+            apiKey: "staging-key",
+            baseUrl: "https://staging.invariance.ai",
+          },
+        },
+      }),
+    );
+
+    const { resolveConfig } = await import("../lib/config.js");
+    const config = resolveConfig();
+
+    expect(config.apiKey).toBe("staging-key");
+    expect(config.baseUrl).toBe("https://staging.invariance.ai");
+  });
+
+  it("should let an explicit profile override the configured default profile", async () => {
+    fs.writeFileSync(
+      configFile,
+      JSON.stringify({
+        profile: "staging",
+        profiles: {
+          staging: { apiKey: "staging-key" },
+          prod: { apiKey: "prod-key", baseUrl: "https://api.useinvariance.com" },
+        },
+      }),
+    );
+
+    const { resolveConfig } = await import("../lib/config.js");
+    const config = resolveConfig("prod");
+
+    expect(config.apiKey).toBe("prod-key");
+    expect(config.baseUrl).toBe("https://api.useinvariance.com");
+  });
+
   it("should throw for unknown profile", async () => {
     fs.writeFileSync(configFile, JSON.stringify({ profiles: {} }));
 
     const { resolveConfig } = await import("../lib/config.js");
 
     expect(() => resolveConfig("nonexistent")).toThrow("Profile 'nonexistent' not found");
+  });
+
+  it("should throw when the configured default profile is missing", async () => {
+    fs.writeFileSync(configFile, JSON.stringify({ profile: "staging" }));
+
+    const { resolveConfig } = await import("../lib/config.js");
+
+    expect(() => resolveConfig()).toThrow("Profile 'staging' not found");
   });
 });
