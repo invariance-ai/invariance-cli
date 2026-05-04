@@ -18,16 +18,29 @@ signalCommand.addCommand(
       .description(
         "Emit a signal manually. Output (--json): {id, agent_id, monitor_id, run_id, node_id, source: 'manual', severity, title, message, status: 'open', type, data, created_at, ...}",
       )
-      .requiredOption("--severity <s>", "info|low|medium|high|critical")
+      .option(
+        "--severity <s>",
+        "One of: info | low | medium | high | critical (default: info)",
+        "info",
+      )
       .requiredOption("--title <text>", "Signal title")
       .option("--message <text>", "Message body")
-      .option("--type <t>", "Signal type key")
-      .option("--run-id <id>", "Attach to run")
-      .option("--node-id <id>", "Attach to node")
-      .option("--data <json>", "Structured data payload")
+      .option("--type <t>", "Signal type key (e.g. cost_spike, policy_violation)")
+      .option("--run-id <id>", "Attach to run. Falls back to $INVARIANCE_RUN_ID.")
+      .option("--node-id <id>", "Attach to node. Falls back to $INVARIANCE_NODE_ID.")
+      .option("--data <json>", "Structured data payload (JSON, max 100KB)")
       .addHelpText(
         "after",
-        "\nExample:\n  $ invariance signal emit --severity high --title 'Suspicious tool call' --run-id run_abc --data '{\"tool\":\"shell\",\"cmd\":\"rm -rf /\"}'\n",
+        [
+          "",
+          "Examples:",
+          "  $ invariance signal emit --title 'Compaction complete'",
+          "  $ invariance signal emit --severity high --title 'Suspicious shell call' \\",
+          "      --run-id run_abc --data '{\"tool\":\"shell\",\"cmd\":\"rm -rf /\"}'",
+          "  $ INVARIANCE_RUN_ID=run_abc invariance signal emit --severity medium \\",
+          "      --title 'Retry threshold exceeded' --type retry_storm",
+          "",
+        ].join("\n"),
       ),
     async ({ client, globals, opts }) => {
       printValue(
@@ -36,8 +49,8 @@ signalCommand.addCommand(
           title: opts.title,
           message: opts.message,
           type: opts.type,
-          run_id: opts.runId,
-          node_id: opts.nodeId,
+          run_id: opts.runId ?? process.env.INVARIANCE_RUN_ID,
+          node_id: opts.nodeId ?? process.env.INVARIANCE_NODE_ID,
           data: parseJsonFlag("data", opts.data),
         }),
         globals,
