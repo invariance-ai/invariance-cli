@@ -80,7 +80,8 @@ export function resolveConfig(profile?: string): { apiKey?: string; baseUrl: str
   if (envLegacyBaseUrl && !envApiUrl && !warnedDeprecatedBaseUrl) {
     warnedDeprecatedBaseUrl = true;
     process.stderr.write(
-      "warning: INVARIANCE_BASE_URL is deprecated; use INVARIANCE_API_URL instead.\n",
+      "warning: INVARIANCE_BASE_URL is deprecated; use INVARIANCE_API_URL instead. " +
+        "Support for INVARIANCE_BASE_URL will be removed on 2026-08-01.\n",
     );
   }
   const envBaseUrl = envApiUrl ?? envLegacyBaseUrl;
