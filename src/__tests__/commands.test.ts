@@ -34,6 +34,7 @@ describe("command wiring", () => {
       "review",
       "agent",
       "metrics",
+      "eval",
       "completions",
       "doctor",
       "version",

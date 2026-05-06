@@ -13,6 +13,7 @@ import { findingCommand } from "./commands/finding/index.js";
 import { reviewCommand } from "./commands/review/index.js";
 import { agentCommand } from "./commands/agent/index.js";
 import { metricsCommand } from "./commands/metrics/index.js";
+import { evalCommand } from "./commands/eval/index.js";
 import { doctorCommand } from "./commands/doctor.js";
 import { completionsCommand } from "./commands/completions.js";
 import { versionCommand } from "./commands/version.js";
@@ -53,6 +54,7 @@ export function buildProgram(): Command {
   program.addCommand(reviewCommand);
   program.addCommand(agentCommand);
   program.addCommand(metricsCommand);
+  program.addCommand(evalCommand);
 
   // Top-level ergonomics: `invariance login` / `invariance logout` mirror
   // `invariance auth login` / `invariance auth logout` (Netlify/Vercel style).
