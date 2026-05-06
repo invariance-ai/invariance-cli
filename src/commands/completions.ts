@@ -11,6 +11,7 @@ export const COMMANDS: Record<string, string[]> = {
   review: ["list", "get", "claim", "unclaim", "resolve"],
   agent: ["me", "set-key"],
   metrics: ["overview"],
+  eval: ["run", "list", "summarize"],
   completions: ["bash", "zsh", "fish"],
 };
 

@@ -162,9 +162,11 @@ export class InvarianceClient {
     return RunSchema.parse(res.run);
   }
 
-  async listRuns(opts: PageOptions = {}): Promise<Page<Run>> {
+  async listRuns(
+    opts: PageOptions & { eval_suite?: string } = {},
+  ): Promise<Page<Run>> {
     return this.parsed(RunListSchema, "GET", "/v1/runs", {
-      params: { cursor: opts.cursor, limit: opts.limit },
+      params: { cursor: opts.cursor, limit: opts.limit, eval_suite: opts.eval_suite },
     });
   }
 
@@ -352,9 +354,11 @@ export class InvarianceClient {
 
   // ── Findings ──
 
-  async listFindings(opts: PageOptions = {}): Promise<Page<Finding>> {
+  async listFindings(
+    opts: PageOptions & { run_id?: string } = {},
+  ): Promise<Page<Finding>> {
     return this.parsed(FindingListSchema, "GET", "/v1/findings", {
-      params: { cursor: opts.cursor, limit: opts.limit },
+      params: { cursor: opts.cursor, limit: opts.limit, run_id: opts.run_id },
     });
   }
 
