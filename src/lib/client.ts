@@ -40,7 +40,10 @@ import {
 import type { z } from "zod";
 
 export interface ClientOptions {
-  apiKey: string;
+  /** API key (inv_live_/inv_test_) used for agent-scoped operations. */
+  apiKey?: string;
+  /** Supabase access token for user-scoped operations (signup/agent management). */
+  accessToken?: string;
   baseUrl: string;
 }
 
@@ -52,12 +55,17 @@ export interface PageOptions {
 type Page<T> = { data: T[]; next_cursor?: string | null };
 
 export class InvarianceClient {
-  private readonly apiKey: string;
+  private readonly apiKey?: string;
+  private readonly accessToken?: string;
   readonly baseUrl: string;
 
   constructor(options: ClientOptions) {
     this.apiKey = options.apiKey;
+    this.accessToken = options.accessToken;
     this.baseUrl = options.baseUrl.replace(/\/+$/, "");
+    if (!this.apiKey && !this.accessToken) {
+      throw new Error("InvarianceClient requires either apiKey or accessToken");
+    }
   }
 
   private async request<T>(
@@ -80,7 +88,7 @@ export class InvarianceClient {
       response = await fetch(url.toString(), {
         method,
         headers: {
-          Authorization: `Bearer ${this.apiKey}`,
+          Authorization: `Bearer ${this.accessToken ?? this.apiKey}`,
           "Content-Type": "application/json",
           "User-Agent": "invariance-cli",
         },
@@ -146,6 +154,30 @@ export class InvarianceClient {
       `/v1/agents/${encodeURIComponent(id)}`,
     );
     return AgentSchema.parse(res.agent);
+  }
+
+  async createAgent(input: { name: string; project_id: string; public_key?: string }): Promise<Agent> {
+    const res = await this.request<{ agent: unknown }>("POST", "/v1/agents", {
+      body: input,
+    });
+    return AgentSchema.parse((res as { agent: unknown }).agent ?? res);
+  }
+
+  async authMe(): Promise<{
+    user: { id: string; email: string };
+    organizations: Array<{ id: string; name: string }>;
+    projects: Array<{ id: string; org_id: string; name: string }>;
+  }> {
+    return this.request("GET", "/v1/auth/me");
+  }
+
+  async issueCliToken(input: { hostname?: string; project_id?: string; expires_in_days?: number } = {}): Promise<{
+    api_key_once: string;
+    agent: Agent;
+    project_id: string;
+    label: string;
+  }> {
+    return this.request("POST", "/v1/auth/cli-token", { body: input });
   }
 
   async rotateAgentKey(publicKey: string): Promise<Agent> {
@@ -431,6 +463,97 @@ export class InvarianceClient {
   } = {}): Promise<unknown> {
     return this.request("GET", "/v1/metrics/overview", { params });
   }
+
+  async metricsAgents(params: {
+    window_hours?: number;
+  } = {}): Promise<unknown> {
+    return this.request("GET", "/v1/metrics/agents", { params });
+  }
+}
+
+// ── Unauthenticated auth endpoints (signup / signin / refresh) ──
+
+export interface AuthSession {
+  access_token: string;
+  refresh_token: string;
+  expires_at: number;
+}
+
+export interface SignupResponse {
+  user: { id: string; email: string };
+  organization: { id: string; name: string };
+  project: { id: string; org_id: string; name: string };
+  agent: { id: string; name: string; project_id: string };
+  api_key_once: string;
+  session: AuthSession | null;
+}
+
+export interface SigninResponse {
+  user: { id: string; email: string };
+  session: AuthSession;
+}
+
+export interface RefreshResponse {
+  session: AuthSession;
+}
+
+async function authPost<T>(baseUrl: string, path: string, body: unknown): Promise<T> {
+  const url = `${baseUrl.replace(/\/+$/, "")}${path}`;
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "User-Agent": "invariance-cli",
+      },
+      body: JSON.stringify(body),
+    });
+  } catch (error) {
+    if (error instanceof TypeError) throw new NetworkError();
+    throw error;
+  }
+  if (!response.ok) {
+    if (response.status === 401 || response.status === 403) {
+      throw new AuthenticationError(
+        `Authentication failed (${response.status}). Check email/password.`,
+      );
+    }
+    let bodyJson: unknown;
+    try {
+      bodyJson = await response.json();
+    } catch {
+      bodyJson = await response.text().catch(() => undefined);
+    }
+    throw new ApiError(extractMessage(bodyJson, response.status), response.status, bodyJson);
+  }
+  return (await response.json()) as T;
+}
+
+export function authSignup(
+  baseUrl: string,
+  body: {
+    email: string;
+    password: string;
+    signup_type?: "individual" | "org";
+    org_name?: string;
+    project_name?: string;
+  },
+): Promise<SignupResponse> {
+  return authPost<SignupResponse>(baseUrl, "/v1/auth/signup", body);
+}
+
+export function authSignin(
+  baseUrl: string,
+  body: { email: string; password: string },
+): Promise<SigninResponse> {
+  return authPost<SigninResponse>(baseUrl, "/v1/auth/signin", body);
+}
+
+export function authRefresh(baseUrl: string, refreshToken: string): Promise<RefreshResponse> {
+  return authPost<RefreshResponse>(baseUrl, "/v1/auth/refresh", {
+    refresh_token: refreshToken,
+  });
 }
 
 function extractMessage(body: unknown, status: number): string {

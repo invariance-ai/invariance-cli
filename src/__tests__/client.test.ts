@@ -1,5 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { InvarianceClient, buildUrl } from "../lib/client.js";
+import {
+  InvarianceClient,
+  buildUrl,
+  authSignup,
+  authSignin,
+  authRefresh,
+} from "../lib/client.js";
 import { AuthenticationError, NetworkError, ApiError } from "../lib/errors.js";
 
 const BASE = "https://api.useinvariance.com";
@@ -179,5 +185,84 @@ describe("InvarianceClient", () => {
     expect(url).not.toContain("from=");
     expect(url).not.toContain("to=");
     expect(url).not.toContain("project_id=");
+  });
+
+  it("uses accessToken bearer when provided (overrides apiKey)", async () => {
+    fetchSpy.mockResolvedValueOnce(jsonResponse({ user: { id: "u_1", email: "x@y.z" }, organizations: [], projects: [] }));
+    const c = new InvarianceClient({ accessToken: "jwt_abc", baseUrl: BASE });
+    await c.authMe();
+    expect(fetchSpy).toHaveBeenCalledWith(
+      `${BASE}/v1/auth/me`,
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: "Bearer jwt_abc" }),
+      }),
+    );
+  });
+
+  it("createAgent posts {name, project_id} and returns the parsed agent", async () => {
+    const agent = {
+      id: "ag_2",
+      name: "new",
+      public_key: null,
+      project_id: "p_1",
+      created_at: "2026-01-01T00:00:00Z",
+    };
+    fetchSpy.mockResolvedValueOnce(jsonResponse({ agent }));
+    const c = new InvarianceClient({ accessToken: "jwt", baseUrl: BASE });
+    const out = await c.createAgent({ name: "new", project_id: "p_1" });
+    expect(out).toEqual(agent);
+    const init = fetchSpy.mock.calls[0]![1] as RequestInit;
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(init.body as string)).toEqual({ name: "new", project_id: "p_1" });
+  });
+
+  it("metricsAgents hits /v1/metrics/agents with window_hours", async () => {
+    fetchSpy.mockResolvedValueOnce(jsonResponse({ window_hours: 24, agents: [] }));
+    const c = new InvarianceClient({ apiKey: "k", baseUrl: BASE });
+    await c.metricsAgents({ window_hours: 24 });
+    expect(String(fetchSpy.mock.calls[0]![0])).toBe(
+      `${BASE}/v1/metrics/agents?window_hours=24`,
+    );
+  });
+});
+
+describe("auth helpers", () => {
+  let fetchSpy: ReturnType<typeof vi.spyOn>;
+  beforeEach(() => {
+    fetchSpy = vi.spyOn(globalThis, "fetch");
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("authSignup posts to /v1/auth/signup", async () => {
+    fetchSpy.mockResolvedValueOnce(
+      jsonResponse({
+        user: { id: "u", email: "a@b.c" },
+        organization: { id: "o", name: "O" },
+        project: { id: "p", org_id: "o", name: "P" },
+        agent: { id: "ag", name: "A", project_id: "p" },
+        api_key_once: "inv_test_x",
+        session: { access_token: "a", refresh_token: "r", expires_at: 1 },
+      }),
+    );
+    await authSignup(BASE, { email: "a@b.c", password: "password123" });
+    expect(String(fetchSpy.mock.calls[0]![0])).toBe(`${BASE}/v1/auth/signup`);
+  });
+
+  it("authSignin maps 401 to AuthenticationError", async () => {
+    fetchSpy.mockResolvedValueOnce(jsonResponse({ message: "bad" }, 401));
+    await expect(authSignin(BASE, { email: "a", password: "b" })).rejects.toBeInstanceOf(
+      AuthenticationError,
+    );
+  });
+
+  it("authRefresh posts refresh_token", async () => {
+    fetchSpy.mockResolvedValueOnce(
+      jsonResponse({ session: { access_token: "a2", refresh_token: "r2", expires_at: 9 } }),
+    );
+    await authRefresh(BASE, "old_refresh");
+    const init = fetchSpy.mock.calls[0]![1] as RequestInit;
+    expect(JSON.parse(init.body as string)).toEqual({ refresh_token: "old_refresh" });
   });
 });

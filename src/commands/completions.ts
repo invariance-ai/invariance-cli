@@ -1,7 +1,7 @@
 import { Command } from "commander";
 
 export const COMMANDS: Record<string, string[]> = {
-  auth: ["login", "logout", "whoami"],
+  auth: ["login", "logout", "whoami", "signup", "signin", "refresh", "issue-key"],
   config: ["get", "set"],
   run: ["start", "list", "get", "update", "cancel", "fork", "metrics", "verify", "narrative", "llm-calls", "nodes", "inspect", "open", "export"],
   node: ["write", "list", "tail"],
@@ -9,8 +9,8 @@ export const COMMANDS: Record<string, string[]> = {
   signal: ["emit", "list", "get", "ack", "resolve"],
   finding: ["list", "get", "update"],
   review: ["list", "get", "claim", "unclaim", "resolve"],
-  agent: ["me", "set-key"],
-  metrics: ["overview"],
+  agent: ["me", "set-key", "create", "list", "get"],
+  metrics: ["overview", "agents"],
   graph: ["get", "entities", "edges", "explain-edge"],
   recipes: ["list", "get", "test"],
   guardrails: ["list", "promote"],
