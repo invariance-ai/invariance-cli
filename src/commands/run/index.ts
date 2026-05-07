@@ -1,7 +1,9 @@
 import { Command } from "commander";
+import { spawn } from "node:child_process";
 import ora from "ora";
 import { action, parseIntFlag, parseJsonFlag, printPage, printValue } from "../../lib/cmd.js";
 import { paginate } from "../../lib/paginate.js";
+import { dashboardBaseUrl } from "../auth/login.js";
 import type { Finding } from "../../types/index.js";
 
 const RUN_COLUMNS = [
@@ -288,6 +290,59 @@ runCommand.addCommand(
       } else {
         process.stdout.write(JSON.stringify(result, null, 2) + "\n");
       }
+    },
+  ) as Command,
+);
+
+runCommand.addCommand(
+  action(
+    new Command("open")
+      .description(
+        "Open a run in the dashboard. With --print, prints the URL instead of launching a browser (agent-friendly).",
+      )
+      .argument("<id>")
+      .option("--print", "Print URL instead of opening browser"),
+    async ({ client, globals, opts, cmd }) => {
+      const id = cmd.args[0]!;
+      const url = `${dashboardBaseUrl(client.baseUrl)}/runs/${encodeURIComponent(id)}`;
+      if (opts.print || globals.json) {
+        printValue({ run_id: id, url }, globals);
+        return;
+      }
+      const opener =
+        process.platform === "darwin"
+          ? "open"
+          : process.platform === "win32"
+            ? "start"
+            : "xdg-open";
+      const child = spawn(opener, [url], { stdio: "ignore", detached: true });
+      child.unref();
+      process.stdout.write(url + "\n");
+    },
+  ) as Command,
+);
+
+runCommand.addCommand(
+  action(
+    new Command("export")
+      .description(
+        "Export a run as a single JSON document (run + nodes). Always emits JSON; --json is implicit.",
+      )
+      .argument("<id>")
+      .option(
+        "--limit <n>",
+        "Max nodes per page when paginating (default 200)",
+        parseIntFlag,
+        200,
+      ),
+    async ({ client, opts, cmd }) => {
+      const id = cmd.args[0]!;
+      const limit: number = opts.limit ?? 200;
+      const [run, nodes] = await Promise.all([
+        client.getRun(id),
+        paginate((cursor) => client.listRunNodes(id, { cursor, limit })),
+      ]);
+      process.stdout.write(JSON.stringify({ run, nodes }) + "\n");
     },
   ) as Command,
 );

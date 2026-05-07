@@ -4,6 +4,7 @@
   "description": "The official Invariance AI command-line interface",
   "type": "module",
   "bin": {
+    "inv": "./dist/index.js",
     "invariance": "./dist/index.js"
   },
   "main": "./dist/index.js",

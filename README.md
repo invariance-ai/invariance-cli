@@ -1,6 +1,8 @@
-# Invariance CLI
+# Invariance CLI (`inv`)
 
 The official command-line interface for [Invariance AI](https://invariance.ai) — monitor, trace, and query your AI systems from the terminal.
+
+The primary binary is `inv` (with `invariance` available as an alias for back-compat). Every read command supports `--json` and emits stable IDs so coding/ops agents (Claude Code, Codex, etc.) can chain commands without scraping output.
 
 Part of the Invariance SDK family:
 
@@ -24,30 +26,41 @@ pnpm add -g @invariance/cli
 
 ```bash
 # Authenticate (browser flow — opens your dashboard)
-invariance login --browser
+inv login --browser
 
 # Or paste an API key directly
-invariance login --api-key inv_live_...
+inv login --api-key inv_live_...
 
-# Confirm identity
-invariance agent me
+# Confirm identity + connectivity (agent-friendly, --json-clean)
+inv status --json
 
 # Start a run, write a trace node, verify the proof chain
-RUN=$(invariance run start --name demo --json | jq -r .id)
-invariance node write "$RUN" --action-type tool_call --input '{"x":1}' --output '{"y":2}'
-invariance run verify "$RUN"
+RUN=$(inv runs start --name demo --json | jq -r .id)
+inv nodes write "$RUN" --action-type tool_call --input '{"x":1}' --output '{"y":2}'
+inv runs verify "$RUN"
 
 # Stream nodes, or fetch one page for scripts/smoke tests
-invariance node tail "$RUN"
-invariance node tail "$RUN" --once --json
+inv nodes tail "$RUN"
+inv nodes tail "$RUN" --once --json
+
+# Export a full run (run + nodes) for offline analysis
+inv runs export "$RUN" > run.json
+
+# Open in dashboard (or just print the URL with --print)
+inv runs open "$RUN" --print
 
 # Monitors, signals, reviews
-invariance monitor list
-invariance signal list
-invariance review list
+inv monitor list
+inv signals list
+inv reviews list
+
+# Stub commands (backend pending — emit structured API_NOT_AVAILABLE errors)
+inv graph get "$RUN" --json
+inv evals create-case --from-run "$RUN" --suite regressions --json
+inv guardrails list --json
 
 # Check your setup
-invariance doctor
+inv doctor
 ```
 
 ## Commands

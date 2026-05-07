@@ -3,7 +3,7 @@ import { Command } from "commander";
 export const COMMANDS: Record<string, string[]> = {
   auth: ["login", "logout", "whoami"],
   config: ["get", "set"],
-  run: ["start", "list", "get", "update", "cancel", "fork", "metrics", "verify", "narrative", "llm-calls", "nodes", "inspect"],
+  run: ["start", "list", "get", "update", "cancel", "fork", "metrics", "verify", "narrative", "llm-calls", "nodes", "inspect", "open", "export"],
   node: ["write", "list", "tail"],
   monitor: ["create", "list", "get", "update", "pause", "resume", "delete", "evaluate", "executions", "findings"],
   signal: ["emit", "list", "get", "ack", "resolve"],
@@ -11,7 +11,11 @@ export const COMMANDS: Record<string, string[]> = {
   review: ["list", "get", "claim", "unclaim", "resolve"],
   agent: ["me", "set-key"],
   metrics: ["overview"],
+  graph: ["get", "entities", "edges", "explain-edge"],
+  recipes: ["list", "get", "test"],
+  guardrails: ["list", "promote"],
   eval: ["run", "list", "summarize"],
+  evals: ["create-case", "list", "run", "export", "run-byo", "ingest-results", "results"],
   completions: ["bash", "zsh", "fish"],
 };
 

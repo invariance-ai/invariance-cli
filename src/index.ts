@@ -13,7 +13,12 @@ import { findingCommand } from "./commands/finding/index.js";
 import { reviewCommand } from "./commands/review/index.js";
 import { agentCommand } from "./commands/agent/index.js";
 import { metricsCommand } from "./commands/metrics/index.js";
+import { graphCommand } from "./commands/graph/index.js";
+import { recipesCommand } from "./commands/recipes/index.js";
+import { guardrailsCommand } from "./commands/guardrails/index.js";
 import { evalCommand } from "./commands/eval/index.js";
+import { evalsCommand } from "./commands/evals/index.js";
+import { statusCommand } from "./commands/status.js";
 import { doctorCommand } from "./commands/doctor.js";
 import { completionsCommand } from "./commands/completions.js";
 import { versionCommand } from "./commands/version.js";
@@ -22,14 +27,17 @@ export function buildProgram(): Command {
   const program = new Command();
 
   program
-    .name("invariance")
+    .name("inv")
     .description(
-      "The Invariance AI command-line interface.\n\n" +
-        "Covers every dashboard resource: runs, nodes, monitors, signals, findings,\n" +
-        "reviews, agents, and metrics. Authenticates with API keys via Bearer auth.\n\n" +
+      "The Invariance AI command-line interface (`inv`, alias `invariance`).\n\n" +
+        "Designed for agents and humans: every read command supports --json and emits\n" +
+        "stable IDs so coding/ops agents can chain commands without scraping output.\n\n" +
+        "Covers runs, nodes, monitors, signals, findings, reviews, agents, metrics, eval,\n" +
+        "and stub command groups for graph/recipes/guardrails/evals (backend pending).\n\n" +
         "Get started:\n" +
-        "  $ invariance login\n" +
-        "  $ invariance agent me",
+        "  $ inv login\n" +
+        "  $ inv status\n" +
+        "  $ inv runs list --json",
     )
     .option("--json", "Output results as JSON")
     .option("--profile <name>", "Use a named configuration profile")
@@ -46,6 +54,19 @@ export function buildProgram(): Command {
   config.addCommand(configSetCommand);
   program.addCommand(config);
 
+  // Plural aliases (`runs`, `nodes`, `signals`, `findings`, `reviews`) match
+  // the agent-tool surface in the spec while the singular forms remain primary
+  // for backward compatibility with existing scripts and docs. `buildProgram`
+  // is called per-test, so guard against duplicate-alias errors from commander.
+  const ensureAlias = (cmd: Command, alias: string) => {
+    if (!cmd.aliases().includes(alias)) cmd.alias(alias);
+  };
+  ensureAlias(runCommand, "runs");
+  ensureAlias(nodeCommand, "nodes");
+  ensureAlias(signalCommand, "signals");
+  ensureAlias(findingCommand, "findings");
+  ensureAlias(reviewCommand, "reviews");
+
   program.addCommand(runCommand);
   program.addCommand(nodeCommand);
   program.addCommand(monitorCommand);
@@ -54,7 +75,12 @@ export function buildProgram(): Command {
   program.addCommand(reviewCommand);
   program.addCommand(agentCommand);
   program.addCommand(metricsCommand);
+  program.addCommand(graphCommand);
+  program.addCommand(recipesCommand);
+  program.addCommand(guardrailsCommand);
   program.addCommand(evalCommand);
+  program.addCommand(evalsCommand);
+  program.addCommand(statusCommand);
 
   // Top-level ergonomics: `invariance login` / `invariance logout` mirror
   // `invariance auth login` / `invariance auth logout` (Netlify/Vercel style).
