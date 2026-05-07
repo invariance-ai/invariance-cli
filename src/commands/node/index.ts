@@ -2,6 +2,10 @@ import fs from "node:fs/promises";
 import { Command } from "commander";
 import { action, parseIntFlag, parseJsonFlag, printPage, printValue } from "../../lib/cmd.js";
 import { paginate } from "../../lib/paginate.js";
+import { resolveRunId } from "../../lib/runs.js";
+
+const LATEST_HELP =
+  "Run id; pass `latest` to resolve to the most recently created run for the current agent.";
 
 const NODE_COLUMNS = [
   { key: "id", label: "ID", width: 20 },
@@ -18,7 +22,7 @@ nodeCommand.addCommand(
       .description(
         "Write one or more nodes to a run. Output (--json): array of {id, run_id, agent_id, parent_id, action_type, type, input, output, error, metadata, timestamp, duration_ms, hash, signature, created_at, ...}",
       )
-      .argument("<run_id>")
+      .argument("<run_id>", LATEST_HELP)
       .option(
         "--action-type <type>",
         "Action type (required unless --file). Open string; canonical values: tool_call, llm_call, decision, sub_agent_spawn, constraint_check, plan_revision (any other string is allowed and rendered with a fallback style)",
@@ -34,7 +38,7 @@ nodeCommand.addCommand(
         "\nExample:\n  $ invariance node write run_abc --action-type tool_call --input '{\"name\":\"search\",\"args\":{\"q\":\"x\"}}' --output '{\"results\":[]}'\n",
       ),
     async ({ client, globals, opts, cmd }) => {
-      const runId = cmd.args[0]!;
+      const runId = await resolveRunId(client, cmd.args[0]!);
       let events: Record<string, unknown>[];
       if (opts.file) {
         const raw = await fs.readFile(opts.file, "utf8");
@@ -78,12 +82,12 @@ nodeCommand.addCommand(
       .description(
         "List nodes for a run. Output (--json): {data: Node[], next_cursor} where Node = {id, run_id, agent_id, parent_id, action_type, type, input, output, error, metadata, timestamp, duration_ms, hash, signature, created_at, ...}",
       )
-      .argument("<run_id>")
+      .argument("<run_id>", LATEST_HELP)
       .option("--limit <n>", "Page size", parseIntFlag)
       .option("--cursor <c>", "opaque pagination token from previous response's next_cursor")
       .option("--all", "Cursor-walk every page and emit a single combined result"),
     async ({ client, globals, opts, cmd }) => {
-      const runId = cmd.args[0]!;
+      const runId = await resolveRunId(client, cmd.args[0]!);
       if (opts.all) {
         const data = await paginate((cursor) =>
           client.listRunNodes(runId, { cursor, limit: opts.limit }),
@@ -103,11 +107,11 @@ nodeCommand.addCommand(
       .description(
         "Poll a run for new nodes and stream them as they arrive. Output (--json): one Node per line — {id, run_id, action_type, type, input, output, error, metadata, timestamp, ...}",
       )
-      .argument("<run_id>")
+      .argument("<run_id>", LATEST_HELP)
       .option("--interval <ms>", "Poll interval (ms)", parseIntFlag, 2000)
       .option("--once", "Fetch one page and exit"),
     async ({ client, globals, opts, cmd }) => {
-      const runId = cmd.args[0]!;
+      const runId = await resolveRunId(client, cmd.args[0]!);
       let cursor: string | undefined;
       let stopped = false;
       const onSigint = () => {

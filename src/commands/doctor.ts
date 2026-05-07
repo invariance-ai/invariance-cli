@@ -4,6 +4,7 @@ import { resolveConfig, isConfigValid, configFileExists } from "../lib/config.js
 import { InvarianceClient } from "../lib/client.js";
 import type { GlobalOptions } from "../types/index.js";
 import { formatOutput } from "../lib/output.js";
+import { setJsonMode } from "../lib/runtime.js";
 
 interface CheckResult {
   name: string;
@@ -90,10 +91,13 @@ Examples:
   )
   .action(async (_opts: Record<string, unknown>, cmd: Command) => {
     const globalOpts = cmd.optsWithGlobals<GlobalOptions>();
+    setJsonMode(!!globalOpts.json);
     const results = await runChecks(globalOpts.profile);
+    const failures = results.filter((r) => r.status === "fail");
 
     if (globalOpts.json) {
       formatOutput(results, { json: true });
+      if (failures.length > 0) process.exit(1);
       return;
     }
 
@@ -109,7 +113,6 @@ Examples:
       console.log(`  ${icon} ${chalk.bold(check.name)}: ${check.message}`);
     }
 
-    const failures = results.filter((r) => r.status === "fail");
     console.log();
     if (failures.length === 0) {
       console.log(chalk.green("All checks passed."));

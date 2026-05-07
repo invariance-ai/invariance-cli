@@ -3,6 +3,7 @@ import type { Command } from "commander";
 import { getAuthenticatedClient } from "./auth.js";
 import { handleError } from "./errors.js";
 import { formatOutput, printTable } from "./output.js";
+import { setJsonMode } from "./runtime.js";
 import type { GlobalOptions } from "../types/index.js";
 import type { InvarianceClient } from "./client.js";
 
@@ -21,6 +22,7 @@ export function action<T = Record<string, any>>(
     const opts = innerCmd.opts() as T;
     try {
       const globals = innerCmd.optsWithGlobals<GlobalOptions>();
+      setJsonMode(!!globals.json);
       const client = getAuthenticatedClient(globals.profile);
       await fn({ client, globals, opts, cmd: innerCmd });
     } catch (error) {

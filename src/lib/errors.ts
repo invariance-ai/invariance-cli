@@ -1,3 +1,5 @@
+import { isJsonMode } from "./runtime.js";
+
 export class InvarianceError extends Error {
   constructor(
     message: string,
@@ -48,9 +50,33 @@ export class NetworkError extends InvarianceError {
   }
 }
 
+interface StructuredErrorPayload {
+  error: {
+    code: string;
+    message: string;
+    status_code?: number;
+  };
+}
+
+function emitStructured(error: InvarianceError | Error): void {
+  const code =
+    error instanceof InvarianceError ? error.code : "UNEXPECTED_ERROR";
+  const payload: StructuredErrorPayload = {
+    error: { code, message: error.message },
+  };
+  if (error instanceof InvarianceError && error.statusCode !== undefined) {
+    payload.error.status_code = error.statusCode;
+  }
+  process.stderr.write(JSON.stringify(payload) + "\n");
+}
+
 export function handleError(error: unknown): never {
+  const json = isJsonMode();
+
   if (error instanceof InvarianceError) {
-    if (process.env["DEBUG"]) {
+    if (json) {
+      emitStructured(error);
+    } else if (process.env["DEBUG"]) {
       console.error(error.stack);
     } else {
       console.error(`Error: ${error.message}`);
@@ -59,13 +85,25 @@ export function handleError(error: unknown): never {
   }
 
   if (error instanceof Error) {
-    console.error(`Unexpected error: ${error.message}`);
-    if (process.env["DEBUG"]) {
-      console.error(error.stack);
+    if (json) {
+      emitStructured(error);
+    } else {
+      console.error(`Unexpected error: ${error.message}`);
+      if (process.env["DEBUG"]) {
+        console.error(error.stack);
+      }
     }
     process.exit(1);
   }
 
-  console.error("An unknown error occurred.");
+  if (json) {
+    process.stderr.write(
+      JSON.stringify({
+        error: { code: "UNKNOWN_ERROR", message: "An unknown error occurred." },
+      }) + "\n",
+    );
+  } else {
+    console.error("An unknown error occurred.");
+  }
   process.exit(1);
 }
