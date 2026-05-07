@@ -37,7 +37,11 @@ inv status --json
 # Start a run, write a trace node, verify the proof chain
 RUN=$(inv runs start --name demo --json | jq -r .id)
 inv nodes write "$RUN" --action-type tool_call --input '{"x":1}' --output '{"y":2}'
+inv runs update "$RUN" --status completed
 inv runs verify "$RUN"
+
+# Inspect a finished run end-to-end (run + nodes in one JSON blob)
+inv runs inspect "$RUN" --json
 
 # Stream nodes, or fetch one page for scripts/smoke tests
 inv nodes tail "$RUN"
@@ -89,6 +93,19 @@ inv doctor
 | `version` | Print the CLI version |
 
 All data commands support `--json` for machine-readable output.
+
+## For coding agents (Claude Code, Codex, …)
+
+`inv` is built so coding agents can debug their own agents deterministically. Two commands cover the loop:
+
+```bash
+inv runs inspect <run_id> --json   # full run + nodes in one structured blob
+inv nodes tail <run_id> --json     # streaming trace events as JSON lines
+```
+
+Every command emits stable IDs and structured errors, so chained calls (`jq`, scripts, agents) don't have to scrape human output. When something fails, an agent can fetch the failing run with `inv runs inspect`, locate the failing node, and report or replay it.
+
+See [`AGENTS.md`](AGENTS.md) for the agent-friendly command reference.
 
 ## Configuration
 
