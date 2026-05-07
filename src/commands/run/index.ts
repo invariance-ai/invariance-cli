@@ -3,6 +3,7 @@ import { spawn } from "node:child_process";
 import ora from "ora";
 import { action, parseIntFlag, parseJsonFlag, printPage, printValue } from "../../lib/cmd.js";
 import { paginate } from "../../lib/paginate.js";
+import { resolveRunId } from "../../lib/runs.js";
 import { dashboardBaseUrl } from "../auth/login.js";
 import type { Finding } from "../../types/index.js";
 
@@ -19,6 +20,9 @@ const NODE_COLUMNS = [
   { key: "type", label: "Type", width: 16 },
   { key: "timestamp", label: "Timestamp", width: 15 },
 ];
+
+const LATEST_HELP =
+  "Run id; pass `latest` to resolve to the most recently created run for the current agent.";
 
 export const runCommand = new Command("run").description("Inspect and manage runs (agent execution sessions)");
 
@@ -54,22 +58,23 @@ runCommand.addCommand(
       .option("--cursor <c>", "opaque pagination token from previous response's next_cursor")
       .option("--all", "Paginate through every page"),
     async ({ client, globals, opts }) => {
+      const useSpinner = !globals.json;
       if (opts.all) {
         let cursor: string | undefined;
         const all: unknown[] = [];
-        const spinner = ora("Fetching runs...").start();
+        const spinner = useSpinner ? ora("Fetching runs...").start() : null;
         do {
           const page = await client.listRuns({ cursor, limit: opts.limit });
           all.push(...page.data);
           cursor = page.next_cursor ?? undefined;
         } while (cursor);
-        spinner.stop();
+        spinner?.stop();
         printPage({ data: all }, RUN_COLUMNS, globals);
         return;
       }
-      const spinner = ora("Fetching runs...").start();
+      const spinner = useSpinner ? ora("Fetching runs...").start() : null;
       const page = await client.listRuns({ cursor: opts.cursor, limit: opts.limit });
-      spinner.stop();
+      spinner?.stop();
       printPage(page, RUN_COLUMNS, globals);
     },
   ) as Command,
@@ -81,9 +86,9 @@ runCommand.addCommand(
       .description(
         "Show a run. Output (--json): {id, agent_id, name, status, metadata, created_at, updated_at, closed_at, parent_run_id, total_input_tokens, total_output_tokens, llm_call_count, tool_call_count, ...}",
       )
-      .argument("<id>"),
+      .argument("<id>", LATEST_HELP),
     async ({ client, globals, cmd }) => {
-      const id = cmd.args[0]!;
+      const id = await resolveRunId(client, cmd.args[0]!);
       printValue(await client.getRun(id), globals);
     },
   ) as Command,
@@ -95,13 +100,30 @@ runCommand.addCommand(
       .description(
         "Update a run (status, metadata). Output (--json): the updated Run = {id, agent_id, name, status, metadata, created_at, updated_at, closed_at, ...}",
       )
-      .argument("<id>")
+      .argument("<id>", LATEST_HELP)
       .option("--status <s>", "open | completed | failed")
       .option("--metadata <json>", "Metadata JSON"),
     async ({ client, globals, opts, cmd }) => {
-      const id = cmd.args[0]!;
+      const id = await resolveRunId(client, cmd.args[0]!);
       const patch: Record<string, unknown> = {};
       if (opts.status) patch.status = opts.status;
+      if (opts.metadata) patch.metadata = parseJsonFlag("metadata", opts.metadata);
+      printValue(await client.updateRun(id, patch), globals);
+    },
+  ) as Command,
+);
+
+runCommand.addCommand(
+  action(
+    new Command("finish")
+      .description(
+        "Mark a run as completed. Sugar for `run update <id> --status completed`. Output (--json): the updated Run = {id, status: 'completed', ...}",
+      )
+      .argument("<id>", LATEST_HELP)
+      .option("--metadata <json>", "Metadata JSON to merge"),
+    async ({ client, globals, opts, cmd }) => {
+      const id = await resolveRunId(client, cmd.args[0]!);
+      const patch: Record<string, unknown> = { status: "completed" };
       if (opts.metadata) patch.metadata = parseJsonFlag("metadata", opts.metadata);
       printValue(await client.updateRun(id, patch), globals);
     },
@@ -114,10 +136,10 @@ runCommand.addCommand(
       .description(
         "Mark a run as failed. Output (--json): the updated Run = {id, status: 'failed', metadata, ...}",
       )
-      .argument("<id>")
+      .argument("<id>", LATEST_HELP)
       .option("--reason <text>", "Failure reason"),
     async ({ client, globals, opts, cmd }) => {
-      const id = cmd.args[0]!;
+      const id = await resolveRunId(client, cmd.args[0]!);
       const patch: Record<string, unknown> = { status: "failed" };
       if (opts.reason) patch.metadata = { error: opts.reason };
       printValue(await client.updateRun(id, patch), globals);
@@ -131,10 +153,10 @@ runCommand.addCommand(
       .description(
         "Fork a run from a checkpoint. Output (--json): the new forked Run = {id, parent_run_id, fork_point_node_id, status: 'open', ...}",
       )
-      .argument("<id>")
+      .argument("<id>", LATEST_HELP)
       .option("--from-node <node_id>", "Node id to fork from"),
     async ({ client, globals, opts, cmd }) => {
-      const id = cmd.args[0]!;
+      const id = await resolveRunId(client, cmd.args[0]!);
       printValue(await client.forkRun(id, opts.fromNode), globals);
     },
   ) as Command,
@@ -146,9 +168,9 @@ runCommand.addCommand(
       .description(
         "Show aggregate metrics for a run. Output (--json): {run_id, total_input_tokens, total_output_tokens, llm_call_count, tool_call_count, cost_usd, latency_ms, ...}",
       )
-      .argument("<id>"),
+      .argument("<id>", LATEST_HELP),
     async ({ client, globals, cmd }) => {
-      const id = cmd.args[0]!;
+      const id = await resolveRunId(client, cmd.args[0]!);
       printValue(await client.runMetrics(id), globals);
     },
   ) as Command,
@@ -160,12 +182,12 @@ runCommand.addCommand(
       .description(
         "Verify the cryptographic proof chain for a run. Output (--json): {run_id, valid, node_count, broken_links, ...}",
       )
-      .argument("<id>"),
+      .argument("<id>", LATEST_HELP),
     async ({ client, globals, cmd }) => {
-      const id = cmd.args[0]!;
-      const spinner = ora("Verifying...").start();
+      const id = await resolveRunId(client, cmd.args[0]!);
+      const spinner = !globals.json ? ora("Verifying...").start() : null;
       const proof = await client.verifyRun(id);
-      spinner.stop();
+      spinner?.stop();
       printValue(proof, globals);
     },
   ) as Command,
@@ -177,13 +199,13 @@ runCommand.addCommand(
       .description(
         "Fetch the LLM-generated narrative for a run. Output (--json): {run_id, summary, scorer, sections, generated_at, ...}",
       )
-      .argument("<id>")
+      .argument("<id>", LATEST_HELP)
       .option("--refresh", "Force regeneration")
       // Narrative is a single document (not paginated); --all is accepted for
       // symmetry with other run subcommands and is a no-op here.
       .option("--all", "Reserved for symmetry; narrative is a single document"),
     async ({ client, globals, opts, cmd }) => {
-      const id = cmd.args[0]!;
+      const id = await resolveRunId(client, cmd.args[0]!);
       printValue(await client.getRunNarrative(id, !!opts.refresh), globals);
     },
   ) as Command,
@@ -195,12 +217,12 @@ runCommand.addCommand(
       .description(
         "List LLM calls in a run. Output (--json): {data: LlmCall[], next_cursor} where LlmCall = {id, run_id, node_id, agent_id, provider, model, input_tokens, output_tokens, cache_read_tokens, ...}",
       )
-      .argument("<id>")
+      .argument("<id>", LATEST_HELP)
       .option("--limit <n>", "Page size", parseIntFlag)
       .option("--cursor <c>", "opaque pagination token from previous response's next_cursor")
       .option("--all", "Cursor-walk every page and emit a single combined result"),
     async ({ client, globals, opts, cmd }) => {
-      const id = cmd.args[0]!;
+      const id = await resolveRunId(client, cmd.args[0]!);
       if (opts.all) {
         const data = await paginate(async (cursor) => {
           const r = (await client.runLlmCalls(id, { cursor, limit: opts.limit })) as {
@@ -223,12 +245,12 @@ runCommand.addCommand(
       .description(
         "List nodes for a run. Output (--json): {data: Node[], next_cursor} where Node = {id, run_id, agent_id, parent_id, action_type, type, input, output, error, metadata, timestamp, hash, ...}",
       )
-      .argument("<id>")
+      .argument("<id>", LATEST_HELP)
       .option("--limit <n>", "Page size", parseIntFlag)
       .option("--cursor <c>", "opaque pagination token from previous response's next_cursor")
       .option("--all", "Cursor-walk every page and emit a single combined result"),
     async ({ client, globals, opts, cmd }) => {
-      const id = cmd.args[0]!;
+      const id = await resolveRunId(client, cmd.args[0]!);
       if (opts.all) {
         const data = await paginate((cursor) =>
           client.listRunNodes(id, { cursor, limit: opts.limit }),
@@ -248,7 +270,7 @@ runCommand.addCommand(
       .description(
         "Composite triage view for a run: returns {run, metrics, narrative, recent_nodes, open_findings} as JSON.",
       )
-      .argument("<id>")
+      .argument("<id>", LATEST_HELP)
       .option(
         "--limit <n>",
         "Max nodes/llm-calls subsection size (default 50)",
@@ -256,7 +278,7 @@ runCommand.addCommand(
         50,
       ),
     async ({ client, globals, opts, cmd }) => {
-      const id = cmd.args[0]!;
+      const id = await resolveRunId(client, cmd.args[0]!);
       const limit: number = opts.limit ?? 50;
 
       const [run, metrics, narrative, nodesPage, findingsPage] = await Promise.all([
@@ -300,10 +322,10 @@ runCommand.addCommand(
       .description(
         "Open a run in the dashboard. With --print, prints the URL instead of launching a browser (agent-friendly).",
       )
-      .argument("<id>")
+      .argument("<id>", LATEST_HELP)
       .option("--print", "Print URL instead of opening browser"),
     async ({ client, globals, opts, cmd }) => {
-      const id = cmd.args[0]!;
+      const id = await resolveRunId(client, cmd.args[0]!);
       const url = `${dashboardBaseUrl(client.baseUrl)}/runs/${encodeURIComponent(id)}`;
       if (opts.print || globals.json) {
         printValue({ run_id: id, url }, globals);
@@ -328,7 +350,7 @@ runCommand.addCommand(
       .description(
         "Export a run as a single JSON document (run + nodes). Always emits JSON; --json is implicit.",
       )
-      .argument("<id>")
+      .argument("<id>", LATEST_HELP)
       .option(
         "--limit <n>",
         "Max nodes per page when paginating (default 200)",
@@ -336,7 +358,7 @@ runCommand.addCommand(
         200,
       ),
     async ({ client, opts, cmd }) => {
-      const id = cmd.args[0]!;
+      const id = await resolveRunId(client, cmd.args[0]!);
       const limit: number = opts.limit ?? 200;
       const [run, nodes] = await Promise.all([
         client.getRun(id),

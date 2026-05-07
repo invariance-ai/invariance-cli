@@ -1,5 +1,6 @@
 import { Command } from "commander";
 import { action, parseIntFlag, printPage, printValue } from "../../lib/cmd.js";
+import { resolveRunId } from "../../lib/runs.js";
 import type { FindingStatus } from "../../types/index.js";
 
 const COLUMNS = [
@@ -19,13 +20,20 @@ findingCommand.addCommand(
       )
       .option("--limit <n>", "Page size", parseIntFlag)
       .option("--cursor <c>", "opaque pagination token from previous response's next_cursor")
-      // NOTE: --status, --severity, --since are accepted client-side and
-      // applied as a post-fetch filter. The /v1/findings backend route does
-      // not currently accept these as query params (future API gap).
+      // NOTE: --status, --severity, --since, --run are accepted client-side
+      // and applied as a post-fetch filter. The /v1/findings backend route
+      // does not currently accept these as query params (future API gap).
       .option("--status <status>", "Filter by status (open|review_requested|resolved|dismissed)")
       .option("--severity <sev>", "Filter by severity")
-      .option("--since <iso>", "Only include findings created at/after this ISO timestamp"),
+      .option("--since <iso>", "Only include findings created at/after this ISO timestamp")
+      .option(
+        "--run <run_id>",
+        "Filter by run id; pass `latest` to resolve to the most recent run.",
+      ),
     async ({ client, globals, opts }) => {
+      const runFilter = opts.run
+        ? await resolveRunId(client, opts.run as string)
+        : undefined;
       const page = await client.listFindings({ cursor: opts.cursor, limit: opts.limit });
       const filtered = {
         ...page,
@@ -33,6 +41,7 @@ findingCommand.addCommand(
           if (opts.status && f.status !== opts.status) return false;
           if (opts.severity && f.severity !== opts.severity) return false;
           if (opts.since && f.created_at && f.created_at < opts.since) return false;
+          if (runFilter && f.run_id !== runFilter) return false;
           return true;
         }),
       };

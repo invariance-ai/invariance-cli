@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import readline from "node:readline";
 import { Command } from "commander";
 import { action, parseIntFlag, parseJsonFlag, printPage, printValue } from "../../lib/cmd.js";
+import { resolveRunId } from "../../lib/runs.js";
 
 async function confirm(question: string): Promise<boolean> {
   if (!process.stdin.isTTY) return false;
@@ -149,13 +150,19 @@ monitorCommand.addCommand(
         "Manually trigger monitor evaluation. Output (--json): MonitorExecution = {id, monitor_id, status: 'running'|'passed'|'failed'|'error'|'skipped', trigger: 'manual', matched_node_ids, started_at, finished_at, error, matched_count, ...}",
       )
       .argument("<id>")
-      .option("--run-id <run>", "Scope to a run")
+      .option(
+        "--run-id <run>",
+        "Scope to a run id; pass `latest` to resolve to the most recent run.",
+      )
       .option("--since <iso>", "ISO lower bound")
       .option("--limit <n>", "Max nodes to scan", parseIntFlag),
     async ({ client, globals, opts, cmd }) => {
+      const runId = opts.runId
+        ? await resolveRunId(client, opts.runId as string)
+        : undefined;
       printValue(
         await client.evaluateMonitor(cmd.args[0]!, {
-          run_id: opts.runId,
+          run_id: runId,
           since: opts.since,
           limit: opts.limit,
         }),
