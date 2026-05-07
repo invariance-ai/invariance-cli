@@ -4,15 +4,23 @@ import os from "node:os";
 import { ConfigSchema } from "../types/index.js";
 import { ConfigError } from "./errors.js";
 
+export interface SessionData {
+  access_token: string;
+  refresh_token: string;
+  expires_at: number;
+}
+
 interface ProfileConfig {
   apiKey?: string;
   baseUrl?: string;
+  session?: SessionData;
 }
 
 interface ConfigFile {
   apiKey?: string;
   baseUrl?: string;
   profile?: string;
+  session?: SessionData;
   profiles?: Record<string, ProfileConfig>;
 }
 
@@ -73,7 +81,11 @@ export function getConfigDir(): string {
  */
 let warnedDeprecatedBaseUrl = false;
 
-export function resolveConfig(profile?: string): { apiKey?: string; baseUrl: string } {
+export function resolveConfig(profile?: string): {
+  apiKey?: string;
+  baseUrl: string;
+  session?: SessionData;
+} {
   const envApiKey = process.env["INVARIANCE_API_KEY"];
   const envApiUrl = process.env["INVARIANCE_API_URL"];
   const envLegacyBaseUrl = process.env["INVARIANCE_BASE_URL"];
@@ -101,7 +113,37 @@ export function resolveConfig(profile?: string): { apiKey?: string; baseUrl: str
   return {
     apiKey: envApiKey ?? profileConfig?.apiKey ?? fileConfig.apiKey,
     baseUrl: envBaseUrl ?? profileConfig?.baseUrl ?? fileConfig.baseUrl ?? DEFAULT_BASE_URL,
+    session: profileConfig?.session ?? fileConfig.session,
   };
+}
+
+export function saveSession(session: SessionData, profile?: string): void {
+  const config = readConfigFile();
+  if (profile) {
+    if (!config.profiles) config.profiles = {};
+    if (!config.profiles[profile]) config.profiles[profile] = {};
+    const p = config.profiles[profile];
+    if (p) p.session = session;
+  } else {
+    config.session = session;
+  }
+  writeConfigFile(config);
+}
+
+export function clearSession(profile?: string): void {
+  if (!fs.existsSync(CONFIG_FILE)) return;
+  let config: ConfigFile;
+  try {
+    config = readConfigFile();
+  } catch {
+    return;
+  }
+  if (profile) {
+    if (config.profiles?.[profile]) delete config.profiles[profile].session;
+  } else {
+    delete config.session;
+  }
+  writeConfigFile(config);
 }
 
 export function getConfigValue(key: string, profile?: string): unknown {
@@ -181,6 +223,7 @@ export function clearConfig(): void {
     config = {};
   }
   delete config.apiKey;
+  delete config.session;
   writeConfigFile(config);
 }
 

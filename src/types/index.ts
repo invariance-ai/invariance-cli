@@ -254,16 +254,25 @@ export type Narrative = z.infer<typeof NarrativeSchema>;
 
 // ── Config file ──
 
+export const SessionSchema = z.object({
+  access_token: z.string(),
+  refresh_token: z.string(),
+  expires_at: z.number(),
+});
+export type Session = z.infer<typeof SessionSchema>;
+
 export const ConfigSchema = z.object({
   apiKey: z.string().optional(),
   baseUrl: z.string().url().optional(),
   profile: z.string().optional(),
+  session: SessionSchema.optional(),
   profiles: z
     .record(
       z.string(),
       z.object({
         apiKey: z.string().optional(),
         baseUrl: z.string().url().optional(),
+        session: SessionSchema.optional(),
       }),
     )
     .optional(),

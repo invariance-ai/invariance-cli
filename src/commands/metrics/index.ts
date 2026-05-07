@@ -13,3 +13,14 @@ metricsCommand.addCommand(
     },
   ) as Command,
 );
+
+metricsCommand.addCommand(
+  action(
+    new Command("agents")
+      .description("Per-agent activity rollup (node + handoff counts) in a time window")
+      .option("--window-hours <n>", "Time window in hours", parseIntFlag),
+    async ({ client, globals, opts }) => {
+      printValue(await client.metricsAgents({ window_hours: opts.windowHours }), globals);
+    },
+  ) as Command,
+);

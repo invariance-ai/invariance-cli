@@ -3,6 +3,10 @@ import { Command } from "commander";
 import { loginCommand, makeLoginCommand } from "./commands/auth/login.js";
 import { logoutCommand, makeLogoutCommand } from "./commands/auth/logout.js";
 import { whoamiCommand } from "./commands/auth/whoami.js";
+import { signupCommand } from "./commands/auth/signup.js";
+import { signinCommand } from "./commands/auth/signin.js";
+import { refreshCommand } from "./commands/auth/refresh.js";
+import { issueKeyCommand } from "./commands/auth/issue-key.js";
 import { configGetCommand } from "./commands/config/get.js";
 import { configSetCommand } from "./commands/config/set.js";
 import { runCommand } from "./commands/run/index.js";
@@ -47,6 +51,10 @@ export function buildProgram(): Command {
   auth.addCommand(loginCommand);
   auth.addCommand(logoutCommand);
   auth.addCommand(whoamiCommand);
+  auth.addCommand(signupCommand);
+  auth.addCommand(signinCommand);
+  auth.addCommand(refreshCommand);
+  auth.addCommand(issueKeyCommand);
   program.addCommand(auth);
 
   const config = new Command("config").description("Manage CLI configuration");

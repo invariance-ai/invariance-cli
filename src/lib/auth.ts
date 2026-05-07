@@ -19,6 +19,24 @@ export function getAuthenticatedClient(profile?: string): InvarianceClient {
 }
 
 /**
+ * Get a client authenticated with the user's Supabase session token. Used for
+ * user-scoped routes that the API key cannot reach (signup-bound endpoints,
+ * agent CRUD, /v1/auth/me, /v1/auth/cli-token).
+ */
+export function getSessionClient(profile?: string): InvarianceClient {
+  const config = resolveConfig(profile);
+  if (!config.session?.access_token) {
+    throw new AuthenticationError(
+      "No user session. Run `inv auth signin` or `inv auth signup` first.",
+    );
+  }
+  return new InvarianceClient({
+    accessToken: config.session.access_token,
+    baseUrl: config.baseUrl,
+  });
+}
+
+/**
  * Validate an API key by calling the whoami endpoint.
  */
 export async function validateApiKey(

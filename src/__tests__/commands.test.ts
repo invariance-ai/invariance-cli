@@ -64,7 +64,9 @@ describe("command wiring", () => {
     expect(names).toContain("login");
     expect(names).toContain("logout");
     const auth = program.commands.find((c) => c.name() === "auth")!;
-    expect(subs(auth)).toEqual(["login", "logout", "whoami"]);
+    expect(subs(auth)).toEqual(
+      ["login", "logout", "whoami", "signup", "signin", "refresh", "issue-key"].sort(),
+    );
   });
 
   it("node tail --once fetches one page and exits", async () => {
