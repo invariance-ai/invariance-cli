@@ -14,6 +14,7 @@ export const COMMANDS: Record<string, string[]> = {
   graph: ["get", "entities", "edges", "explain-edge"],
   recipes: ["list", "get", "test"],
   guardrails: ["list", "promote"],
+  eval: ["run", "list", "summarize"],
   evals: ["create-case", "list", "run", "export", "run-byo", "ingest-results", "results"],
   completions: ["bash", "zsh", "fish"],
 };

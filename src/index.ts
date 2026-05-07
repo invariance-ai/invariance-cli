@@ -16,6 +16,7 @@ import { metricsCommand } from "./commands/metrics/index.js";
 import { graphCommand } from "./commands/graph/index.js";
 import { recipesCommand } from "./commands/recipes/index.js";
 import { guardrailsCommand } from "./commands/guardrails/index.js";
+import { evalCommand } from "./commands/eval/index.js";
 import { evalsCommand } from "./commands/evals/index.js";
 import { statusCommand } from "./commands/status.js";
 import { doctorCommand } from "./commands/doctor.js";
@@ -31,7 +32,7 @@ export function buildProgram(): Command {
       "The Invariance AI command-line interface (`inv`, alias `invariance`).\n\n" +
         "Designed for agents and humans: every read command supports --json and emits\n" +
         "stable IDs so coding/ops agents can chain commands without scraping output.\n\n" +
-        "Covers runs, nodes, monitors, signals, findings, reviews, agents, metrics,\n" +
+        "Covers runs, nodes, monitors, signals, findings, reviews, agents, metrics, eval,\n" +
         "and stub command groups for graph/recipes/guardrails/evals (backend pending).\n\n" +
         "Get started:\n" +
         "  $ inv login\n" +
@@ -77,6 +78,7 @@ export function buildProgram(): Command {
   program.addCommand(graphCommand);
   program.addCommand(recipesCommand);
   program.addCommand(guardrailsCommand);
+  program.addCommand(evalCommand);
   program.addCommand(evalsCommand);
   program.addCommand(statusCommand);
 
