@@ -16,6 +16,7 @@ import { signalCommand } from "./commands/signal/index.js";
 import { findingCommand } from "./commands/finding/index.js";
 import { reviewCommand } from "./commands/review/index.js";
 import { agentCommand } from "./commands/agent/index.js";
+import { memoryCommand } from "./commands/memory/index.js";
 import { metricsCommand } from "./commands/metrics/index.js";
 import { graphCommand } from "./commands/graph/index.js";
 import { recipesCommand } from "./commands/recipes/index.js";
@@ -82,6 +83,7 @@ export function buildProgram(): Command {
   program.addCommand(findingCommand);
   program.addCommand(reviewCommand);
   program.addCommand(agentCommand);
+  program.addCommand(memoryCommand);
   program.addCommand(metricsCommand);
   program.addCommand(graphCommand);
   program.addCommand(recipesCommand);
