@@ -10,6 +10,7 @@ export const COMMANDS: Record<string, string[]> = {
   finding: ["list", "get", "update"],
   review: ["list", "get", "claim", "unclaim", "resolve"],
   agent: ["me", "set-key", "create", "list", "get"],
+  memory: ["read", "write"],
   metrics: ["overview", "agents"],
   graph: ["get", "entities", "edges", "explain-edge"],
   recipes: ["list", "get", "test"],

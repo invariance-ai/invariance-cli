@@ -37,6 +37,15 @@ import {
   NetworkError,
   NotFoundError,
 } from "./errors.js";
+import {
+  MemoryReadResponseSchema,
+  MemoryWriteResponseSchema,
+  type MemoryReadResponse,
+  type MemoryWriteResponse,
+  type MemorySource,
+  type MemorySubjectType,
+  type EvidenceRef,
+} from "../types/memory.js";
 import type { z } from "zod";
 
 export interface ClientOptions {
@@ -454,6 +463,40 @@ export class InvarianceClient {
     notes?: string,
   ): Promise<Review> {
     return this.patchReview(id, { decision, ...(notes ? { notes } : {}) });
+  }
+
+  // ── Memory ──
+
+  async memoryRead(input: {
+    run_id?: string;
+    node_id?: string;
+    subject_type: MemorySubjectType;
+    subject_id: string;
+    key: string;
+    used_for: string;
+  }): Promise<MemoryReadResponse> {
+    return this.parsed(MemoryReadResponseSchema, "POST", "/v1/memory/read", { body: input });
+  }
+
+  async memoryWrite(input: {
+    run_id?: string;
+    node_id?: string;
+    subject_type: MemorySubjectType;
+    subject_id: string;
+    key: string;
+    value: unknown;
+    used_for: string;
+    source?: MemorySource;
+    confidence?: number;
+    provenance?: EvidenceRef[];
+    valid_until?: string | null;
+  }): Promise<MemoryWriteResponse> {
+    const body = {
+      ...input,
+      source: input.source ?? "agent_write",
+      confidence: input.confidence ?? 1.0,
+    };
+    return this.parsed(MemoryWriteResponseSchema, "POST", "/v1/memory/write", { body });
   }
 
   // ── Metrics ──
