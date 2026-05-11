@@ -30,6 +30,13 @@ import {
   type ReviewDecision,
   type Narrative,
   type Agent,
+  type EvalDataset,
+  type EvalDatasetExample,
+  type EvalScorer,
+  type ScorerSpec,
+  type EvalRunRecord,
+  type EvalResultRecord,
+  type CompareResponse,
 } from "../types/index.js";
 import {
   ApiError,
@@ -497,6 +504,137 @@ export class InvarianceClient {
       confidence: input.confidence ?? 1.0,
     };
     return this.parsed(MemoryWriteResponseSchema, "POST", "/v1/memory/write", { body });
+  }
+
+  // ── Evals: datasets ──
+
+  async createEvalDataset(input: {
+    name: string;
+    description?: string;
+    metadata?: Record<string, unknown>;
+  }): Promise<EvalDataset> {
+    const res = await this.request<{ dataset: EvalDataset }>(
+      "POST",
+      "/v1/eval-datasets",
+      { body: input },
+    );
+    return res.dataset;
+  }
+
+  async listEvalDatasets(opts: PageOptions = {}): Promise<Page<EvalDataset>> {
+    return this.request<Page<EvalDataset>>("GET", "/v1/eval-datasets", {
+      params: { cursor: opts.cursor, limit: opts.limit },
+    });
+  }
+
+  async getEvalDataset(id: string): Promise<EvalDataset> {
+    const res = await this.request<{ dataset: EvalDataset }>(
+      "GET",
+      `/v1/eval-datasets/${encodeURIComponent(id)}`,
+    );
+    return res.dataset;
+  }
+
+  async appendEvalDatasetExample(
+    id: string,
+    body: {
+      input: Record<string, unknown>;
+      expected?: Record<string, unknown>;
+      metadata?: Record<string, unknown>;
+    },
+  ): Promise<EvalDatasetExample> {
+    const res = await this.request<{ example: EvalDatasetExample }>(
+      "POST",
+      `/v1/eval-datasets/${encodeURIComponent(id)}/examples`,
+      { body },
+    );
+    return res.example;
+  }
+
+  // ── Evals: scorers ──
+
+  async createEvalScorer(input: {
+    name: string;
+    description?: string;
+    kind: "assertion" | "code" | "llm" | "builtin";
+    definition?: Record<string, unknown>;
+    metadata?: Record<string, unknown>;
+  }): Promise<EvalScorer> {
+    const res = await this.request<{ scorer: EvalScorer }>(
+      "POST",
+      "/v1/eval-scorers",
+      { body: input },
+    );
+    return res.scorer;
+  }
+
+  async listEvalScorers(opts: PageOptions = {}): Promise<Page<EvalScorer>> {
+    return this.request<Page<EvalScorer>>("GET", "/v1/eval-scorers", {
+      params: { cursor: opts.cursor, limit: opts.limit },
+    });
+  }
+
+  // ── Evals: experiment / compare ──
+
+  async runEvalSuite(
+    suiteId: string,
+    body: {
+      scorer_specs?: ScorerSpec[];
+      baseline_run_id?: string | null;
+    } = {},
+  ): Promise<EvalRunRecord> {
+    const res = await this.request<{ eval_run: EvalRunRecord }>(
+      "POST",
+      `/v1/eval-suites/${encodeURIComponent(suiteId)}/run`,
+      { body },
+    );
+    return res.eval_run;
+  }
+
+  async runEvalExperiment(
+    evalRunId: string,
+    body: {
+      scorer_specs: ScorerSpec[];
+      baseline_run_id?: string | null;
+    },
+  ): Promise<EvalRunRecord> {
+    const res = await this.request<{ eval_run: EvalRunRecord }>(
+      "POST",
+      `/v1/eval-runs/${encodeURIComponent(evalRunId)}/experiment`,
+      { body },
+    );
+    return res.eval_run;
+  }
+
+  async compareEvalRuns(
+    runId: string,
+    baselineRunId: string,
+  ): Promise<CompareResponse> {
+    const res = await this.request<{ comparison: CompareResponse }>(
+      "GET",
+      `/v1/eval-runs/${encodeURIComponent(runId)}/compare`,
+      { params: { baseline: baselineRunId } },
+    );
+    return res.comparison;
+  }
+
+  async getEvalRun(id: string): Promise<EvalRunRecord> {
+    const res = await this.request<{ eval_run: EvalRunRecord }>(
+      "GET",
+      `/v1/eval-runs/${encodeURIComponent(id)}`,
+    );
+    return res.eval_run;
+  }
+
+  async listEvalResults(
+    id: string,
+    opts: PageOptions = {},
+  ): Promise<Page<EvalResultRecord>> {
+    return this.request<Page<EvalResultRecord>>(
+      "GET",
+      `/v1/eval-runs/${encodeURIComponent(id)}/results`,
+      { params: { cursor: opts.cursor, limit: opts.limit } },
+    );
   }
 
   // ── Metrics ──

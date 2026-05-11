@@ -4,6 +4,10 @@ import ora from "ora";
 import { action, parseIntFlag, printPage, printValue } from "../../lib/cmd.js";
 import type { InvarianceClient } from "../../lib/client.js";
 import type { Finding, Run } from "../../types/index.js";
+import { datasetCommand } from "./dataset.js";
+import { scorerCommand } from "./scorer.js";
+import { experimentCommand } from "./experiment.js";
+import { compareCommand } from "./compare.js";
 
 const FAIL_SEVERITIES = new Set<Finding["severity"]>(["medium", "high", "critical"]);
 
@@ -90,9 +94,8 @@ async function runOneCase(
 }
 
 export const evalCommand = new Command("eval").description(
-  "Run starter eval suites and inspect their results. " +
-    "An eval suite is a set of runs sharing metadata.eval.suite; pass/fail is " +
-    "derived from open findings of severity >= medium.",
+  "Eval primitives: datasets, scorers, experiments, run comparison, plus the " +
+    "legacy run/list/summarize workflow over metadata.eval.suite runs.",
 );
 
 evalCommand.addCommand(
@@ -202,3 +205,8 @@ evalCommand.addCommand(
     },
   ) as Command,
 );
+
+evalCommand.addCommand(datasetCommand);
+evalCommand.addCommand(scorerCommand);
+evalCommand.addCommand(experimentCommand);
+evalCommand.addCommand(compareCommand);

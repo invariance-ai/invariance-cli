@@ -279,6 +279,107 @@ export const ConfigSchema = z.object({
 });
 export type Config = z.infer<typeof ConfigSchema>;
 
+// ── Eval primitives (mirror @invariance/api-types) ──
+
+export interface EvalDataset {
+  id: string;
+  agent_id: string;
+  name: string;
+  description: string;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EvalDatasetExample {
+  id: string;
+  dataset_id: string;
+  agent_id: string;
+  input: Record<string, unknown>;
+  expected: Record<string, unknown>;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export type EvalScorerKind = "assertion" | "code" | "llm" | "builtin";
+
+export interface EvalScorer {
+  id: string;
+  agent_id: string;
+  name: string;
+  description: string;
+  kind: EvalScorerKind;
+  definition: Record<string, unknown>;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export type ScorerName =
+  | "exact_match"
+  | "contains"
+  | "numeric_tolerance"
+  | "json_match"
+  | "levenshtein";
+
+export interface ScorerSpec {
+  name: ScorerName | string;
+  config?: Record<string, unknown>;
+}
+
+export type EvalRunStatus =
+  | "queued"
+  | "running"
+  | "passed"
+  | "failed"
+  | "errored";
+
+export interface EvalRunRecord {
+  id: string;
+  suite_id: string;
+  agent_id: string;
+  status: EvalRunStatus;
+  summary: Record<string, unknown>;
+  scorer_specs: ScorerSpec[];
+  baseline_run_id: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EvalResultRecord {
+  id: string;
+  eval_run_id: string;
+  case_id: string;
+  status: "passed" | "failed" | "errored";
+  scores: Record<string, number>;
+  failures: Array<{ message: string; path?: string; observed?: unknown; expected?: unknown }>;
+  created_at: string;
+}
+
+export interface ScoreDelta {
+  scorer: string;
+  baseline: number | null;
+  current: number | null;
+  delta: number | null;
+}
+
+export interface CaseScoreDelta {
+  case_id: string;
+  baseline_result_id: string | null;
+  current_result_id: string;
+  scores: ScoreDelta[];
+}
+
+export interface CompareResponse {
+  run_id: string;
+  baseline_run_id: string;
+  aggregate: ScoreDelta[];
+  cases: CaseScoreDelta[];
+}
+
 // ── CLI global options ──
 
 export interface GlobalOptions {
