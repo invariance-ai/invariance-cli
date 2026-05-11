@@ -26,7 +26,12 @@ Examples:
         console.log(`(not set)`);
       } else {
         // Mask API keys in human output
-        if (key.includes("apiKey") && typeof value === "string" && value.length > 8) {
+        const isKeyMaterial =
+          (key.includes("apiKey") ||
+            (key.startsWith("aiKeys.") && !key.endsWith("braintrustBaseUrl")) ||
+            key.includes(".aiKeys.")) &&
+          !key.endsWith("braintrustBaseUrl");
+        if (isKeyMaterial && typeof value === "string" && value.length > 8) {
           console.log(value.slice(0, 8) + "…" + value.slice(-4));
         } else {
           console.log(String(value));
