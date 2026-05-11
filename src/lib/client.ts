@@ -157,6 +157,18 @@ export class InvarianceClient {
     };
   }
 
+  async listOperators(projectId: string): Promise<Page<Agent>> {
+    const res = await this.request<{ data: unknown[]; next_cursor?: string | null }>(
+      "GET",
+      "/v1/operators",
+      { params: { project_id: projectId } },
+    );
+    return {
+      data: res.data.map((a) => AgentSchema.parse(a)),
+      next_cursor: res.next_cursor ?? null,
+    };
+  }
+
   async getAgent(id: string): Promise<Agent> {
     const res = await this.request<{ agent: unknown }>(
       "GET",
@@ -165,11 +177,26 @@ export class InvarianceClient {
     return AgentSchema.parse(res.agent);
   }
 
-  async createAgent(input: { name: string; project_id: string; public_key?: string }): Promise<Agent> {
+  async getOperator(id: string): Promise<Agent> {
+    const res = await this.request<{ operator?: unknown; agent?: unknown }>(
+      "GET",
+      `/v1/operators/${encodeURIComponent(id)}`,
+    );
+    return AgentSchema.parse(res.operator ?? res.agent);
+  }
+
+  async createAgent(input: { name: string; project_id: string; public_key?: string; operator_type?: "agent" | "human" }): Promise<Agent> {
     const res = await this.request<{ agent: unknown }>("POST", "/v1/agents", {
       body: input,
     });
     return AgentSchema.parse((res as { agent: unknown }).agent ?? res);
+  }
+
+  async createOperator(input: { name: string; project_id: string; public_key?: string; operator_type?: "agent" | "human" }): Promise<Agent> {
+    const res = await this.request<{ agent: unknown }>("POST", "/v1/operators", {
+      body: input,
+    });
+    return AgentSchema.parse((res as { operator?: unknown; agent?: unknown }).operator ?? res.agent ?? res);
   }
 
   async authMe(): Promise<{
@@ -198,7 +225,12 @@ export class InvarianceClient {
 
   // ── Runs ──
 
-  async startRun(input: { name?: string; metadata?: Record<string, unknown> }): Promise<Run> {
+  async startRun(input: {
+    name?: string;
+    metadata?: Record<string, unknown>;
+    session_type?: string | null;
+    session_source?: string | null;
+  }): Promise<Run> {
     const res = await this.request<{ run: unknown }>("POST", "/v1/runs", { body: input });
     return RunSchema.parse(res.run);
   }

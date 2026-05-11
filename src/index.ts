@@ -15,7 +15,7 @@ import { monitorCommand } from "./commands/monitor/index.js";
 import { signalCommand } from "./commands/signal/index.js";
 import { findingCommand } from "./commands/finding/index.js";
 import { reviewCommand } from "./commands/review/index.js";
-import { agentCommand } from "./commands/agent/index.js";
+import { agentCommand, operatorCommand } from "./commands/agent/index.js";
 import { memoryCommand } from "./commands/memory/index.js";
 import { metricsCommand } from "./commands/metrics/index.js";
 import { graphCommand } from "./commands/graph/index.js";
@@ -37,7 +37,7 @@ export function buildProgram(): Command {
       "The Invariance AI command-line interface (`inv`, alias `invariance`).\n\n" +
         "Designed for agents and humans: every read command supports --json and emits\n" +
         "stable IDs so coding/ops agents can chain commands without scraping output.\n\n" +
-        "Covers runs, nodes, monitors, signals, findings, reviews, agents, metrics, eval,\n" +
+        "Covers runs, nodes, monitors, signals, findings, reviews, operators, metrics, eval,\n" +
         "and stub command groups for graph/recipes/guardrails/evals (backend pending).\n\n" +
         "Get started:\n" +
         "  $ inv login\n" +
@@ -83,6 +83,7 @@ export function buildProgram(): Command {
   program.addCommand(findingCommand);
   program.addCommand(reviewCommand);
   program.addCommand(agentCommand);
+  program.addCommand(operatorCommand);
   program.addCommand(memoryCommand);
   program.addCommand(metricsCommand);
   program.addCommand(graphCommand);

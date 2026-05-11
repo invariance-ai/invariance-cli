@@ -13,11 +13,13 @@ export type RunStatus = z.infer<typeof RunStatusSchema>;
 export const AgentSchema = z.object({
   id: z.string(),
   name: z.string(),
+  operator_type: z.enum(["agent", "human"]).optional(),
   public_key: z.string().nullable(),
   project_id: z.string(),
   created_at: z.string(),
 });
 export type Agent = z.infer<typeof AgentSchema>;
+export type Operator = Agent;
 
 export const ApiKeyPublicSchema = z.object({
   id: z.string(),
@@ -29,6 +31,7 @@ export type ApiKeyPublic = z.infer<typeof ApiKeyPublicSchema>;
 
 export const MeSchema = z.object({
   agent: AgentSchema,
+  operator: AgentSchema.optional(),
   api_key: ApiKeyPublicSchema.optional(),
 });
 export type Me = z.infer<typeof MeSchema>;
@@ -46,9 +49,13 @@ export const ListSchema = <T extends z.ZodTypeAny>(item: T) =>
 export const RunSchema = z.object({
   id: z.string(),
   agent_id: z.string(),
+  operator_id: z.string().optional(),
+  operator_type: z.enum(["agent", "human"]).optional(),
   name: z.string(),
   status: RunStatusSchema,
   metadata: z.record(z.string(), z.unknown()),
+  session_type: z.string().nullable().optional(),
+  session_source: z.string().nullable().optional(),
   created_at: z.string(),
   updated_at: z.string(),
   closed_at: z.string().nullable(),
