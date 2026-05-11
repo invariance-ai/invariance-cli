@@ -7,3 +7,8 @@ coverage/
 .env
 .env.*
 package-lock.json
+
+# Local working state — not tracked
+_archive/
+_review/
+_worktrees/
