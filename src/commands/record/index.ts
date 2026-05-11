@@ -10,6 +10,7 @@ import {
   type AgentEventInput,
   type Source,
 } from "../../lib/record.js";
+import { runMcpProxy } from "./mcp-proxy.js";
 
 export const recordCommand = new Command("record")
   .description("Capture Claude Code / Codex / SDK sessions into Invariance");
@@ -126,6 +127,35 @@ sessionCmd
   });
 
 // ── flush ──────────────────────────────────────────────────────────────────
+
+recordCommand
+  .command("mcp-proxy")
+  .description("Wrap a stdio MCP server and record every tools/call")
+  .requiredOption(
+    "--upstream <cmd>",
+    "Upstream MCP server command (the program to wrap)",
+  )
+  .option(
+    "--external-id <id>",
+    "External session id (defaults to a per-process id; pass a stable id to coalesce across restarts)",
+  )
+  .allowUnknownOption(true)
+  .allowExcessArguments(true)
+  .action(async (opts: { upstream: string; externalId?: string }, cmd) => {
+    // Anything after `--` (or trailing positional args) is forwarded to the
+    // upstream verbatim. Commander stashes them on cmd.args.
+    const upstreamArgs = cmd.args ?? [];
+    try {
+      await runMcpProxy({
+        upstreamCommand: opts.upstream,
+        upstreamArgs,
+        externalSessionId: opts.externalId,
+      });
+    } catch (err) {
+      logRecordError("mcp-proxy", err);
+      process.exit(1);
+    }
+  });
 
 recordCommand
   .command("flush")
