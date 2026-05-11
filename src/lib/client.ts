@@ -37,6 +37,14 @@ import {
   type EvalRunRecord,
   type EvalResultRecord,
   type CompareResponse,
+  RecipeSchema,
+  RecipeListSchema,
+  GuardrailSchema,
+  GuardrailListSchema,
+  type Recipe,
+  type Guardrail,
+  type GuardrailMode,
+  type GuardrailStatus,
 } from "../types/index.js";
 import {
   ApiError,
@@ -649,6 +657,83 @@ export class InvarianceClient {
     window_hours?: number;
   } = {}): Promise<unknown> {
     return this.request("GET", "/v1/metrics/agents", { params });
+  }
+
+  // ── Recipes ──
+
+  async listRecipes(opts: PageOptions = {}): Promise<Page<Recipe>> {
+    return this.parsed(RecipeListSchema, "GET", "/v1/recipes", {
+      params: { cursor: opts.cursor, limit: opts.limit },
+    });
+  }
+
+  async getRecipe(idOrSlug: string): Promise<Recipe> {
+    const res = await this.request<{ recipe: unknown }>(
+      "GET",
+      `/v1/recipes/${encodeURIComponent(idOrSlug)}`,
+    );
+    return RecipeSchema.parse(res.recipe);
+  }
+
+  async updateRecipe(
+    id: string,
+    patch: { enabled?: boolean; default_mode?: GuardrailMode },
+  ): Promise<Recipe> {
+    const res = await this.request<{ recipe: unknown }>(
+      "PATCH",
+      `/v1/recipes/${encodeURIComponent(id)}`,
+      { body: patch },
+    );
+    return RecipeSchema.parse(res.recipe);
+  }
+
+  // ── Guardrails ──
+
+  async listGuardrails(
+    opts: PageOptions & { status?: GuardrailStatus; recipe_id?: string } = {},
+  ): Promise<Page<Guardrail>> {
+    return this.parsed(GuardrailListSchema, "GET", "/v1/guardrails", {
+      params: {
+        cursor: opts.cursor,
+        limit: opts.limit,
+        status: opts.status,
+        recipe_id: opts.recipe_id,
+      },
+    });
+  }
+
+  async getGuardrail(id: string): Promise<Guardrail> {
+    const res = await this.request<{ guardrail: unknown }>(
+      "GET",
+      `/v1/guardrails/${encodeURIComponent(id)}`,
+    );
+    return GuardrailSchema.parse(res.guardrail);
+  }
+
+  async createGuardrail(input: {
+    title: string;
+    recipe_id?: string | null;
+    finding_id?: string | null;
+    rule?: string;
+    mode?: GuardrailMode;
+    status?: GuardrailStatus;
+    agent_id?: string;
+  }): Promise<Guardrail> {
+    const res = await this.request<{ guardrail: unknown }>(
+      "POST",
+      "/v1/guardrails",
+      { body: input },
+    );
+    return GuardrailSchema.parse(res.guardrail);
+  }
+
+  async promoteGuardrail(id: string, to: GuardrailStatus): Promise<Guardrail> {
+    const res = await this.request<{ guardrail: unknown }>(
+      "POST",
+      `/v1/guardrails/${encodeURIComponent(id)}/promote`,
+      { body: { to } },
+    );
+    return GuardrailSchema.parse(res.guardrail);
   }
 }
 

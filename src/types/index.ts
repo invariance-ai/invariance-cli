@@ -380,6 +380,53 @@ export interface CompareResponse {
   cases: CaseScoreDelta[];
 }
 
+// ── Recipes & Guardrails ──
+
+export const GuardrailModeSchema = z.enum(["suggested", "shadow", "active_monitor"]);
+export type GuardrailMode = z.infer<typeof GuardrailModeSchema>;
+
+export const GuardrailStatusSchema = z.enum([
+  "suggested",
+  "accepted",
+  "shadow",
+  "active_monitor",
+  "rejected",
+]);
+export type GuardrailStatus = z.infer<typeof GuardrailStatusSchema>;
+
+export const RecipeSchema = z.object({
+  id: z.string(),
+  slug: z.string(),
+  title: z.string(),
+  domain: z.string(),
+  description: z.string(),
+  control: z.string(),
+  rule: z.string(),
+  default_mode: GuardrailModeSchema,
+  enabled: z.boolean(),
+  builtin: z.boolean(),
+  created_at: z.string(),
+  updated_at: z.string(),
+});
+export type Recipe = z.infer<typeof RecipeSchema>;
+export const RecipeListSchema = ListSchema(RecipeSchema);
+
+export const GuardrailSchema = z.object({
+  id: z.string(),
+  agent_id: z.string(),
+  recipe_id: z.string().nullable(),
+  finding_id: z.string().nullable(),
+  title: z.string(),
+  rule: z.string(),
+  mode: GuardrailModeSchema,
+  status: GuardrailStatusSchema,
+  monitor_id: z.string().nullable(),
+  created_at: z.string(),
+  updated_at: z.string(),
+});
+export type Guardrail = z.infer<typeof GuardrailSchema>;
+export const GuardrailListSchema = ListSchema(GuardrailSchema);
+
 // ── CLI global options ──
 
 export interface GlobalOptions {
