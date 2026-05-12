@@ -16,6 +16,11 @@ import {
   ReviewListSchema,
   NarrativeSchema,
   AgentSchema,
+  OperatorSchema,
+  AgentSessionSchema,
+  type Operator,
+  type OperatorType,
+  type AgentSession,
   type Me,
   type Run,
   type RunProof,
@@ -201,6 +206,124 @@ export class InvarianceClient {
       body: { public_key: publicKey },
     });
     return AgentSchema.parse(res.agent);
+  }
+
+  // ── Operators (canonical) ──
+
+  async meOperator(): Promise<{ operator: Operator }> {
+    const res = await this.request<{ operator: unknown }>("GET", "/v1/operators/me");
+    return { operator: OperatorSchema.parse(res.operator) };
+  }
+
+  async listOperators(
+    opts: { project_id?: string; type?: OperatorType } = {},
+  ): Promise<Page<Operator>> {
+    const res = await this.request<{ data: unknown[]; next_cursor?: string | null }>(
+      "GET",
+      "/v1/operators",
+      { params: { project_id: opts.project_id, operator_type: opts.type } },
+    );
+    return {
+      data: res.data.map((o) => OperatorSchema.parse(o)),
+      next_cursor: res.next_cursor ?? null,
+    };
+  }
+
+  async getOperator(id: string): Promise<Operator> {
+    const res = await this.request<{ operator: unknown }>(
+      "GET",
+      `/v1/operators/${encodeURIComponent(id)}`,
+    );
+    return OperatorSchema.parse(res.operator);
+  }
+
+  async createOperator(input: {
+    name: string;
+    operator_type: OperatorType;
+    project_id: string;
+    public_key?: string;
+  }): Promise<Operator> {
+    const res = await this.request<{ operator: unknown }>("POST", "/v1/operators", {
+      body: input,
+    });
+    return OperatorSchema.parse(
+      (res as { operator?: unknown }).operator ?? res,
+    );
+  }
+
+  // ── Agent sessions ──
+
+  async createAgentSession(input: {
+    source: string;
+    external_session_id?: string;
+    session_type?: string;
+    title?: string;
+    agent_id?: string;
+    operator_id?: string;
+    run_id?: string;
+    metadata?: Record<string, unknown>;
+  }): Promise<AgentSession> {
+    const res = await this.request<{ session: unknown }>(
+      "POST",
+      "/v1/agent-sessions",
+      { body: input },
+    );
+    return AgentSessionSchema.parse(
+      (res as { session?: unknown }).session ?? res,
+    );
+  }
+
+  async listAgentSessions(
+    opts: PageOptions & { source?: string; agent_id?: string; operator_id?: string } = {},
+  ): Promise<Page<AgentSession>> {
+    const res = await this.request<{ data: unknown[]; next_cursor?: string | null }>(
+      "GET",
+      "/v1/agent-sessions",
+      {
+        params: {
+          cursor: opts.cursor,
+          limit: opts.limit,
+          source: opts.source,
+          agent_id: opts.agent_id,
+          operator_id: opts.operator_id,
+        },
+      },
+    );
+    return {
+      data: res.data.map((s) => AgentSessionSchema.parse(s)),
+      next_cursor: res.next_cursor ?? null,
+    };
+  }
+
+  async getAgentSession(id: string): Promise<AgentSession> {
+    const res = await this.request<{ session: unknown }>(
+      "GET",
+      `/v1/agent-sessions/${encodeURIComponent(id)}`,
+    );
+    return AgentSessionSchema.parse(res.session);
+  }
+
+  async updateAgentSession(
+    id: string,
+    patch: Record<string, unknown>,
+  ): Promise<AgentSession> {
+    const res = await this.request<{ session: unknown }>(
+      "PATCH",
+      `/v1/agent-sessions/${encodeURIComponent(id)}`,
+      { body: patch },
+    );
+    return AgentSessionSchema.parse(res.session);
+  }
+
+  async writeAgentSessionEvents(
+    id: string,
+    events: Record<string, unknown>[],
+  ): Promise<unknown> {
+    return this.request(
+      "POST",
+      `/v1/agent-sessions/${encodeURIComponent(id)}/events`,
+      { body: events },
+    );
   }
 
   // ── Runs ──
