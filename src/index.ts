@@ -22,6 +22,7 @@ import { operatorCommand } from "./commands/operator/index.js";
 import { sessionCommand } from "./commands/session/index.js";
 import { memoryCommand } from "./commands/memory/index.js";
 import { metricsCommand } from "./commands/metrics/index.js";
+import { dnaCommand } from "./commands/dna/index.js";
 import { graphCommand } from "./commands/graph/index.js";
 import { recipesCommand } from "./commands/recipes/index.js";
 import { guardrailsCommand } from "./commands/guardrails/index.js";
@@ -94,6 +95,7 @@ export function buildProgram(): Command {
   program.addCommand(sessionCommand);
   program.addCommand(memoryCommand);
   program.addCommand(metricsCommand);
+  program.addCommand(dnaCommand);
   program.addCommand(graphCommand);
   program.addCommand(recipesCommand);
   program.addCommand(guardrailsCommand);

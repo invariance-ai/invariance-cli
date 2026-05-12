@@ -46,10 +46,18 @@ import {
   RecipeListSchema,
   GuardrailSchema,
   GuardrailListSchema,
+  DnaEntityListSchema,
+  DnaEdgeListSchema,
+  DnaEdgeExplainSchema,
+  DnaQueryResponseSchema,
   type Recipe,
   type Guardrail,
   type GuardrailMode,
   type GuardrailStatus,
+  type DnaEntity,
+  type DnaEdge,
+  type DnaEdgeExplain,
+  type DnaQueryResponse,
 } from "../types/index.js";
 import {
   ApiError,
@@ -857,6 +865,56 @@ export class InvarianceClient {
       { body: { to } },
     );
     return GuardrailSchema.parse(res.guardrail);
+  }
+
+  // ── DNA ──
+
+  async listDnaEntities(
+    opts: PageOptions & { run_id?: string; kind?: string; q?: string } = {},
+  ): Promise<Page<DnaEntity>> {
+    return this.parsed(DnaEntityListSchema, "GET", "/v1/dna/entities", {
+      params: {
+        cursor: opts.cursor,
+        limit: opts.limit,
+        run_id: opts.run_id,
+        kind: opts.kind,
+        q: opts.q,
+      },
+    });
+  }
+
+  async listDnaEdges(
+    opts: PageOptions & { run_id?: string; kind?: string; entity_id?: string } = {},
+  ): Promise<Page<DnaEdge>> {
+    return this.parsed(DnaEdgeListSchema, "GET", "/v1/dna/edges", {
+      params: {
+        cursor: opts.cursor,
+        limit: opts.limit,
+        run_id: opts.run_id,
+        kind: opts.kind,
+        entity_id: opts.entity_id,
+      },
+    });
+  }
+
+  async explainDnaEdge(id: string): Promise<DnaEdgeExplain> {
+    return this.parsed(
+      DnaEdgeExplainSchema,
+      "GET",
+      `/v1/dna/edges/${encodeURIComponent(id)}/explain`,
+    );
+  }
+
+  async queryDna(input: {
+    q: string;
+    kinds?: string[];
+    run_id?: string;
+    include_edges?: boolean;
+    limit?: number;
+  }): Promise<DnaQueryResponse> {
+    return this.parsed(DnaQueryResponseSchema, "POST", "/v1/dna/query", {
+      body: input,
+    });
   }
 }
 

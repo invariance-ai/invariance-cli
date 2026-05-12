@@ -487,6 +487,61 @@ export const GuardrailSchema = z.object({
 export type Guardrail = z.infer<typeof GuardrailSchema>;
 export const GuardrailListSchema = ListSchema(GuardrailSchema);
 
+// ── DNA / Context Graph ──
+
+export const DnaEntitySchema = z.object({
+  id: z.string(),
+  run_id: z.string(),
+  agent_id: z.string(),
+  kind: z.string(),
+  source: z.string(),
+  external_id: z.string().nullable(),
+  title: z.string(),
+  attributes: z.record(z.string(), z.unknown()),
+  evidence_node_ids: z.array(z.string()),
+  confidence: z.number(),
+  created_at: z.string(),
+});
+export type DnaEntity = z.infer<typeof DnaEntitySchema>;
+export const DnaEntityListSchema = ListSchema(DnaEntitySchema);
+
+export const DnaEdgeSchema = z.object({
+  id: z.string(),
+  run_id: z.string(),
+  agent_id: z.string(),
+  source_id: z.string(),
+  target_id: z.string(),
+  kind: z.string(),
+  label: z.string(),
+  confidence: z.number(),
+  evidence_node_ids: z.array(z.string()),
+  provenance: z.record(z.string(), z.unknown()),
+  recipe_id: z.string().nullable(),
+  created_at: z.string(),
+});
+export type DnaEdge = z.infer<typeof DnaEdgeSchema>;
+export const DnaEdgeListSchema = ListSchema(DnaEdgeSchema);
+
+export const DnaEdgeExplainSchema = z.object({
+  edge: DnaEdgeSchema,
+  source_entity: DnaEntitySchema.nullable(),
+  target_entity: DnaEntitySchema.nullable(),
+});
+export type DnaEdgeExplain = z.infer<typeof DnaEdgeExplainSchema>;
+
+export const DnaQueryResponseSchema = z.object({
+  query: z.object({
+    q: z.string(),
+    kinds: z.array(z.string()).optional(),
+    run_id: z.string().optional(),
+    include_edges: z.boolean().optional(),
+    limit: z.number().optional(),
+  }),
+  entities: z.array(DnaEntitySchema),
+  edges: z.array(DnaEdgeSchema),
+});
+export type DnaQueryResponse = z.infer<typeof DnaQueryResponseSchema>;
+
 // ── CLI global options ──
 
 export interface GlobalOptions {
