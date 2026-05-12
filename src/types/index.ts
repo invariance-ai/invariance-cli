@@ -261,11 +261,22 @@ export const SessionSchema = z.object({
 });
 export type Session = z.infer<typeof SessionSchema>;
 
+export const AiKeysSchema = z.object({
+  anthropic: z.string().optional(),
+  openai: z.string().optional(),
+  braintrust: z.string().optional(),
+  braintrustBaseUrl: z.string().url().optional(),
+});
+export type AiKeys = z.infer<typeof AiKeysSchema>;
+export const AI_PROVIDERS = ["anthropic", "openai", "braintrust", "braintrustBaseUrl"] as const;
+export type AiProvider = (typeof AI_PROVIDERS)[number];
+
 export const ConfigSchema = z.object({
   apiKey: z.string().optional(),
   baseUrl: z.string().url().optional(),
   profile: z.string().optional(),
   session: SessionSchema.optional(),
+  aiKeys: AiKeysSchema.optional(),
   profiles: z
     .record(
       z.string(),
@@ -273,6 +284,7 @@ export const ConfigSchema = z.object({
         apiKey: z.string().optional(),
         baseUrl: z.string().url().optional(),
         session: SessionSchema.optional(),
+        aiKeys: AiKeysSchema.optional(),
       }),
     )
     .optional(),

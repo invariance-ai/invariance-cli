@@ -9,6 +9,8 @@ import { refreshCommand } from "./commands/auth/refresh.js";
 import { issueKeyCommand } from "./commands/auth/issue-key.js";
 import { configGetCommand } from "./commands/config/get.js";
 import { configSetCommand } from "./commands/config/set.js";
+import { configSetAiKeyCommand } from "./commands/config/set-ai-key.js";
+import { configListAiKeysCommand } from "./commands/config/list-ai-keys.js";
 import { runCommand } from "./commands/run/index.js";
 import { nodeCommand } from "./commands/node/index.js";
 import { monitorCommand } from "./commands/monitor/index.js";
@@ -62,6 +64,8 @@ export function buildProgram(): Command {
   const config = new Command("config").description("Manage CLI configuration");
   config.addCommand(configGetCommand);
   config.addCommand(configSetCommand);
+  config.addCommand(configSetAiKeyCommand);
+  config.addCommand(configListAiKeysCommand);
   program.addCommand(config);
 
   // Plural aliases (`runs`, `nodes`, `signals`, `findings`, `reviews`) match

@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
-import { ConfigSchema } from "../types/index.js";
+import { AI_PROVIDERS, ConfigSchema, type AiKeys, type AiProvider } from "../types/index.js";
 import { ConfigError } from "./errors.js";
 
 export interface SessionData {
@@ -14,6 +14,7 @@ interface ProfileConfig {
   apiKey?: string;
   baseUrl?: string;
   session?: SessionData;
+  aiKeys?: AiKeys;
 }
 
 interface ConfigFile {
@@ -21,7 +22,23 @@ interface ConfigFile {
   baseUrl?: string;
   profile?: string;
   session?: SessionData;
+  aiKeys?: AiKeys;
   profiles?: Record<string, ProfileConfig>;
+}
+
+const AI_KEY_ENV: Record<AiProvider, string> = {
+  anthropic: "ANTHROPIC_API_KEY",
+  openai: "OPENAI_API_KEY",
+  braintrust: "BRAINTRUST_API_KEY",
+  braintrustBaseUrl: "BRAINTRUST_OPENAI_BASE_URL",
+};
+
+export function isAiProvider(value: string): value is AiProvider {
+  return (AI_PROVIDERS as readonly string[]).includes(value);
+}
+
+export function aiKeyEnvVar(provider: AiProvider): string {
+  return AI_KEY_ENV[provider];
 }
 
 const CONFIG_DIR = path.join(os.homedir(), ".invariance");
@@ -117,6 +134,70 @@ export function resolveConfig(profile?: string): {
   };
 }
 
+/**
+ * Resolve AI provider keys (Anthropic, OpenAI, Braintrust) used for running
+ * models in evals. These are orthogonal to the Invariance API key — they
+ * are *never* sent to the Invariance API.
+ *
+ * Priority: env var > profile aiKeys > root aiKeys.
+ */
+export function resolveAiKeys(profile?: string): AiKeys {
+  const fileConfig = readConfigFile();
+  const selectedProfile = profile ?? fileConfig.profile;
+
+  let profileConfig: ProfileConfig | undefined;
+  if (selectedProfile) {
+    profileConfig = fileConfig.profiles?.[selectedProfile];
+    if (!profileConfig) {
+      throw new ConfigError(`Profile '${selectedProfile}' not found in config.`);
+    }
+  }
+
+  const result: AiKeys = {};
+  for (const provider of AI_PROVIDERS) {
+    const fromEnv = process.env[AI_KEY_ENV[provider]];
+    const fromProfile = profileConfig?.aiKeys?.[provider];
+    const fromRoot = fileConfig.aiKeys?.[provider];
+    const value = fromEnv ?? fromProfile ?? fromRoot;
+    if (value) result[provider] = value;
+  }
+  return result;
+}
+
+export function setAiKey(provider: AiProvider, value: string, profile?: string): void {
+  const config = readConfigFile();
+  if (profile) {
+    if (!config.profiles) config.profiles = {};
+    if (!config.profiles[profile]) config.profiles[profile] = {};
+    const p = config.profiles[profile];
+    if (p) {
+      if (!p.aiKeys) p.aiKeys = {};
+      p.aiKeys[provider] = value;
+    }
+  } else {
+    if (!config.aiKeys) config.aiKeys = {};
+    config.aiKeys[provider] = value;
+  }
+  writeConfigFile(config);
+}
+
+export function clearAiKey(provider: AiProvider, profile?: string): void {
+  if (!fs.existsSync(CONFIG_FILE)) return;
+  let config: ConfigFile;
+  try {
+    config = readConfigFile();
+  } catch {
+    return;
+  }
+  if (profile) {
+    const p = config.profiles?.[profile];
+    if (p?.aiKeys) delete p.aiKeys[provider];
+  } else if (config.aiKeys) {
+    delete config.aiKeys[provider];
+  }
+  writeConfigFile(config);
+}
+
 export function saveSession(session: SessionData, profile?: string): void {
   const config = readConfigFile();
   if (profile) {
@@ -161,6 +242,16 @@ export function getConfigValue(key: string, profile?: string): unknown {
   if (key === "baseUrl") return fileConfig.baseUrl ?? DEFAULT_BASE_URL;
   if (key === "profile") return fileConfig.profile;
 
+  if (key.startsWith("aiKeys.")) {
+    const provider = key.slice("aiKeys.".length);
+    if (!isAiProvider(provider)) return undefined;
+    if (profile && fileConfig.profiles) {
+      const p = fileConfig.profiles[profile];
+      if (p?.aiKeys?.[provider] !== undefined) return p.aiKeys[provider];
+    }
+    return fileConfig.aiKeys?.[provider];
+  }
+
   // Check nested keys
   if (key.startsWith("profiles.")) {
     const parts = key.split(".");
@@ -188,10 +279,20 @@ export function setConfigValue(key: string, value: string): void {
     config.baseUrl = value;
   } else if (key === "profile") {
     config.profile = value;
+  } else if (key.startsWith("aiKeys.")) {
+    const provider = key.slice("aiKeys.".length);
+    if (!isAiProvider(provider)) {
+      throw new ConfigError(
+        `Unknown AI provider: '${provider}'. Valid: ${AI_PROVIDERS.join(", ")}.`,
+      );
+    }
+    if (!config.aiKeys) config.aiKeys = {};
+    config.aiKeys[provider] = value;
   } else if (key.startsWith("profiles.")) {
     const parts = key.split(".");
     const profileName = parts[1];
     const profileKey = parts[2];
+    const profileSubKey = parts[3];
     if (profileName && profileKey) {
       if (!config.profiles) config.profiles = {};
       if (!config.profiles[profileName]) config.profiles[profileName] = {};
@@ -199,14 +300,22 @@ export function setConfigValue(key: string, value: string): void {
       if (p) {
         if (profileKey === "apiKey") p.apiKey = value;
         else if (profileKey === "baseUrl") p.baseUrl = value;
-        else throw new ConfigError(`Unknown profile key: ${profileKey}`);
+        else if (profileKey === "aiKeys" && profileSubKey) {
+          if (!isAiProvider(profileSubKey)) {
+            throw new ConfigError(
+              `Unknown AI provider: '${profileSubKey}'. Valid: ${AI_PROVIDERS.join(", ")}.`,
+            );
+          }
+          if (!p.aiKeys) p.aiKeys = {};
+          p.aiKeys[profileSubKey] = value;
+        } else throw new ConfigError(`Unknown profile key: ${profileKey}`);
       }
     } else {
       throw new ConfigError(`Invalid key format. Use 'profiles.<name>.<key>'.`);
     }
   } else {
     throw new ConfigError(
-      `Unknown config key: '${key}'. Valid keys: apiKey, baseUrl, profile, profiles.<name>.<key>`,
+      `Unknown config key: '${key}'. Valid keys: apiKey, baseUrl, profile, aiKeys.<provider>, profiles.<name>.<key>`,
     );
   }
 

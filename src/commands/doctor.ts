@@ -1,8 +1,14 @@
 import { Command } from "commander";
 import chalk from "chalk";
-import { resolveConfig, isConfigValid, configFileExists } from "../lib/config.js";
+import {
+  resolveConfig,
+  resolveAiKeys,
+  isConfigValid,
+  configFileExists,
+  aiKeyEnvVar,
+} from "../lib/config.js";
 import { InvarianceClient } from "../lib/client.js";
-import type { GlobalOptions } from "../types/index.js";
+import type { AiProvider, GlobalOptions } from "../types/index.js";
 import { formatOutput } from "../lib/output.js";
 import { setJsonMode } from "../lib/runtime.js";
 
@@ -77,6 +83,26 @@ async function runChecks(profile?: string): Promise<CheckResult[]> {
     });
   }
 
+  // Check 5: AI provider keys (Anthropic / OpenAI / Braintrust)
+  // These are optional — only needed for LLM-judge scorers in evals.
+  const aiKeys = resolveAiKeys(profile);
+  const judgeProviders: AiProvider[] = ["anthropic", "openai", "braintrust"];
+  const present = judgeProviders.filter((p) => aiKeys[p]);
+  if (present.length > 0) {
+    const sources = present
+      .map((p) => `${p}=${process.env[aiKeyEnvVar(p)] ? "env" : "config"}`)
+      .join(", ");
+    results.push({ name: "AI provider keys", status: "pass", message: sources });
+  } else {
+    results.push({
+      name: "AI provider keys",
+      status: "warn",
+      message:
+        "None configured. Required for LLM-judge eval scorers. " +
+        `Set via \`inv config set-ai-key <provider> <key>\` or env vars ` +
+        `(${judgeProviders.map((p) => aiKeyEnvVar(p)).join(", ")}).`,
+    });
+  }
   return results;
 }
 

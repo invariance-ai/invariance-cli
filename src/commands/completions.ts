@@ -2,7 +2,7 @@ import { Command } from "commander";
 
 export const COMMANDS: Record<string, string[]> = {
   auth: ["login", "logout", "whoami", "signup", "signin", "refresh", "issue-key"],
-  config: ["get", "set"],
+  config: ["get", "list-ai-keys", "set", "set-ai-key"],
   run: ["start", "list", "get", "update", "finish", "cancel", "fork", "metrics", "verify", "narrative", "llm-calls", "nodes", "inspect", "open", "export"],
   node: ["write", "list", "tail"],
   monitor: ["create", "list", "get", "update", "pause", "resume", "delete", "evaluate", "executions", "findings"],
