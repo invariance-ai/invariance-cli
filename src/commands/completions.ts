@@ -12,6 +12,7 @@ export const COMMANDS: Record<string, string[]> = {
   agent: ["me", "set-key", "create", "list", "get"],
   memory: ["read", "write"],
   metrics: ["overview", "agents"],
+  dna: ["entities", "edges", "explain-edge", "query"],
   graph: ["get", "entities", "edges", "explain-edge"],
   recipes: ["list", "get", "enable", "disable", "set-mode", "promote"],
   guardrails: ["list", "get", "promote"],

@@ -69,6 +69,54 @@ describe("command wiring", () => {
     );
   });
 
+  it("dna query posts to /v1/dna/query", async () => {
+    process.env.INVARIANCE_API_KEY = "inv_test_key";
+    process.env.INVARIANCE_BASE_URL = "https://api.test";
+    const response = {
+      query: { q: "Acme discharge", kinds: ["patient"], include_edges: true, limit: 5 },
+      entities: [],
+      edges: [],
+    };
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(JSON.stringify(response), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    const writes: string[] = [];
+    const writeSpy = vi
+      .spyOn(process.stdout, "write")
+      .mockImplementation((chunk: unknown) => {
+        writes.push(String(chunk));
+        return true;
+      });
+    const program = buildProgram();
+    program.exitOverride();
+
+    await program.parseAsync([
+      "--json",
+      "dna",
+      "query",
+      "Acme discharge",
+      "--kind",
+      "patient",
+      "--limit",
+      "5",
+    ], { from: "user" });
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(String(fetchSpy.mock.calls[0]?.[0])).toBe("https://api.test/v1/dna/query");
+    expect(fetchSpy.mock.calls[0]?.[1]).toMatchObject({ method: "POST" });
+    expect(JSON.parse(String(fetchSpy.mock.calls[0]?.[1]?.body))).toEqual({
+      q: "Acme discharge",
+      kinds: ["patient"],
+      limit: 5,
+      include_edges: true,
+    });
+    expect(JSON.parse(writes.join("").trimEnd())).toEqual(response);
+    writeSpy.mockRestore();
+  });
+
   it("node tail --once fetches one page and exits", async () => {
     process.env.INVARIANCE_API_KEY = "inv_test_key";
     process.env.INVARIANCE_BASE_URL = "https://api.test";
