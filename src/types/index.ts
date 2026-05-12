@@ -33,6 +33,54 @@ export const MeSchema = z.object({
 });
 export type Me = z.infer<typeof MeSchema>;
 
+// ── Operators (canonical superset of agents) ──
+
+export const OperatorTypeSchema = z.enum(["agent", "human"]);
+export type OperatorType = z.infer<typeof OperatorTypeSchema>;
+
+export const OperatorSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  operator_type: OperatorTypeSchema,
+  public_key: z.string().nullable().optional(),
+  project_id: z.string(),
+  created_at: z.string(),
+});
+export type Operator = z.infer<typeof OperatorSchema>;
+
+// ── Agent sessions ──
+
+export const AgentSessionSourceSchema = z.enum([
+  "claude_code",
+  "openai_codex",
+  "cursor",
+  "screen_recording",
+  "microphone",
+  "meeting",
+  "granola_note",
+  "manual_note",
+  "api",
+  "cli",
+  "other",
+]);
+export type AgentSessionSource = z.infer<typeof AgentSessionSourceSchema>;
+
+export const AgentSessionSchema = z.object({
+  id: z.string(),
+  agent_id: z.string().nullable().optional(),
+  operator_id: z.string().nullable().optional(),
+  run_id: z.string().nullable().optional(),
+  source: z.string(),
+  session_type: z.string().nullable().optional(),
+  external_session_id: z.string().nullable().optional(),
+  title: z.string().nullable().optional(),
+  status: z.string().nullable().optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+  created_at: z.string(),
+  updated_at: z.string().optional(),
+});
+export type AgentSession = z.infer<typeof AgentSessionSchema>;
+
 // ── Pagination wrapper (backend emits `data` + `next_cursor`) ──
 
 export const ListSchema = <T extends z.ZodTypeAny>(item: T) =>
