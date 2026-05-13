@@ -1,6 +1,6 @@
 import { Command } from "commander";
 import { parseIntFlag, printPage, printValue } from "../../lib/cmd.js";
-import { getSessionClient } from "../../lib/auth.js";
+import { getAuthenticatedClient, getSessionClient } from "../../lib/auth.js";
 import { handleError } from "../../lib/errors.js";
 import type { OperatorType } from "../../types/index.js";
 
@@ -24,11 +24,12 @@ function parseOperatorType(value: string): OperatorType {
 
 operatorCommand.addCommand(
   new Command("me")
-    .description("Show the caller operator")
+    .description("Show the caller operator (uses API key, mirrors `inv agent me`)")
     .action(async (_opts: object, cmd: Command) => {
       try {
         const globals = cmd.optsWithGlobals<{ json?: boolean; profile?: string }>();
-        const client = getSessionClient(globals.profile);
+        // /v1/operators/me is API-key-authed on the server, same as /v1/agents/me.
+        const client = getAuthenticatedClient(globals.profile);
         const { operator } = await client.meOperator();
         printValue(operator, { json: globals.json });
       } catch (error) {
