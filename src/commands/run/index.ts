@@ -34,14 +34,20 @@ runCommand.addCommand(
       )
       .option("--name <name>", "Run name")
       .option("--metadata <json>", "Metadata JSON object")
+      .option("--case-id <id>", "Case (workflow instance) this run belongs to; server inherits tenant_id/end_user_id from the case")
+      .option("--tenant-id <id>", "Override tenant_id (normally inherited from case)")
+      .option("--end-user-id <id>", "Override end_user_id (normally inherited from case)")
       .addHelpText(
         "after",
-        "\nExample:\n  $ invariance run start --name 'nightly-eval' --metadata '{\"env\":\"prod\"}'\n",
+        "\nExample:\n  $ invariance run start --name 'nightly-eval' --metadata '{\"env\":\"prod\"}'\n  $ invariance run start --name 'underwrite' --case-id case_abc123\n",
       ),
     async ({ client, globals, opts }) => {
       const run = await client.startRun({
         name: opts.name,
         metadata: parseJsonFlag("metadata", opts.metadata) as Record<string, unknown> | undefined,
+        case_id: opts.caseId,
+        tenant_id: opts.tenantId,
+        end_user_id: opts.endUserId,
       });
       printValue(run, globals);
     },

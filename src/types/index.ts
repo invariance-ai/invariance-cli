@@ -81,6 +81,29 @@ export const AgentSessionSchema = z.object({
 });
 export type AgentSession = z.infer<typeof AgentSessionSchema>;
 
+// ── Cases (workflow instances) ──
+
+export const CaseStatusSchema = z.enum(["open", "closed"]);
+export type CaseStatus = z.infer<typeof CaseStatusSchema>;
+
+export const CaseSchema = z.object({
+  id: z.string(),
+  agent_id: z.string(),
+  tenant_id: z.string().nullable(),
+  end_user_id: z.string().nullable(),
+  workflow_key: z.string(),
+  status: CaseStatusSchema,
+  outcome: z.string().nullable(),
+  outcome_value_usd: z.number().nullable(),
+  owner: z.string().nullable(),
+  custom_attrs: z.record(z.string(), z.unknown()),
+  opened_at: z.string(),
+  closed_at: z.string().nullable(),
+  created_at: z.string(),
+  updated_at: z.string(),
+});
+export type Case = z.infer<typeof CaseSchema>;
+
 // ── Pagination wrapper (backend emits `data` + `next_cursor`) ──
 
 export const ListSchema = <T extends z.ZodTypeAny>(item: T) =>
@@ -115,6 +138,7 @@ export const RunSchema = z.object({
 });
 export type Run = z.infer<typeof RunSchema>;
 export const RunListSchema = ListSchema(RunSchema);
+export const CaseListSchema = ListSchema(CaseSchema);
 
 // ── Nodes ──
 

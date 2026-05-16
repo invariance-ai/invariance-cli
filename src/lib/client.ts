@@ -1,5 +1,9 @@
 import {
   MeSchema,
+  CaseSchema,
+  CaseListSchema,
+  type Case,
+  type CaseStatus,
   RunSchema,
   RunListSchema,
   RunProofSchema,
@@ -342,9 +346,70 @@ export class InvarianceClient {
     );
   }
 
+  // ── Cases (workflow instances) ──
+
+  async createCase(input: {
+    workflow_key: string;
+    tenant_id?: string;
+    end_user_id?: string;
+    owner?: string;
+    custom_attrs?: Record<string, unknown>;
+    opened_at?: string;
+  }): Promise<Case> {
+    const res = await this.request<{ case: unknown }>("POST", "/v1/cases", { body: input });
+    return CaseSchema.parse(res.case);
+  }
+
+  async listCases(
+    opts: PageOptions & {
+      tenant_id?: string;
+      end_user_id?: string;
+      workflow_key?: string;
+      status?: CaseStatus;
+      outcome?: string;
+    } = {},
+  ): Promise<Page<Case>> {
+    return this.parsed(CaseListSchema, "GET", "/v1/cases", {
+      params: {
+        cursor: opts.cursor,
+        limit: opts.limit,
+        tenant_id: opts.tenant_id,
+        end_user_id: opts.end_user_id,
+        workflow_key: opts.workflow_key,
+        status: opts.status,
+        outcome: opts.outcome,
+      },
+    });
+  }
+
+  async getCase(id: string): Promise<unknown> {
+    // Returns CaseWithRuns — schema-parsed as a plain object since the runs
+    // array is large enough that a tight schema adds little value at the CLI.
+    const res = await this.request<{ case: unknown }>(
+      "GET",
+      `/v1/cases/${encodeURIComponent(id)}`,
+    );
+    return res.case;
+  }
+
+  async updateCase(id: string, patch: Record<string, unknown>): Promise<Case> {
+    const res = await this.request<{ case: unknown }>(
+      "PATCH",
+      `/v1/cases/${encodeURIComponent(id)}`,
+      { body: patch },
+    );
+    return CaseSchema.parse(res.case);
+  }
+
   // ── Runs ──
 
-  async startRun(input: { name?: string; metadata?: Record<string, unknown> }): Promise<Run> {
+  async startRun(input: {
+    name?: string;
+    metadata?: Record<string, unknown>;
+    case_id?: string;
+    tenant_id?: string;
+    end_user_id?: string;
+  }): Promise<Run> {
     const res = await this.request<{ run: unknown }>("POST", "/v1/runs", { body: input });
     return RunSchema.parse(res.run);
   }
