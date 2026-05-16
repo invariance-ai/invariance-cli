@@ -107,6 +107,30 @@ Every command emits stable IDs and structured errors, so chained calls (`jq`, sc
 
 See [`AGENTS.md`](AGENTS.md) for the agent-friendly command reference.
 
+### Exit codes
+
+| Code | Meaning |
+| --- | --- |
+| `0` | Success |
+| `1` | Error (auth, network, validation, unexpected) |
+| `2` | `API_NOT_AVAILABLE` — command/backend not yet implemented |
+
+### Error codes (stable, machine-readable)
+
+In `--json` mode, errors are written to **stderr** as `{"error":{"code","message","status_code"?}}`. Stable codes you can branch on:
+
+| Code | When |
+| --- | --- |
+| `AUTH_ERROR` | Missing or invalid API key |
+| `NOT_FOUND` | Resource ID not found (404) |
+| `API_ERROR` | Backend returned a non-2xx for an existing endpoint |
+| `CONFIG_ERROR` | Config file or profile is malformed |
+| `NETWORK_ERROR` | Could not reach the API |
+| `API_NOT_AVAILABLE` | Backend endpoint is not yet implemented (stub) |
+| `UNEXPECTED_ERROR` / `UNKNOWN_ERROR` | Anything else |
+
+In `--json` mode, `success`/`warn`/`info` messages are also redirected to stderr so stdout stays a single parseable JSON document.
+
 ## Configuration
 
 The CLI reads configuration from (highest priority first):

@@ -1,5 +1,7 @@
 import chalk from "chalk";
 
+import { isJsonMode } from "./runtime.js";
+
 export interface OutputOptions {
   json?: boolean;
   noColor?: boolean;
@@ -88,23 +90,30 @@ export function printKeyValue(
   }
 }
 
-/**
- * Print a success message.
- */
+// In --json mode, success/warn/info are sent to stderr so that stdout stays a
+// single parseable JSON document. Agents pipe stdout into jq; the glyphs broke
+// that contract.
+
 export function success(message: string): void {
+  if (isJsonMode()) {
+    process.stderr.write(`${message}\n`);
+    return;
+  }
   console.log(chalk.green("✓") + " " + message);
 }
 
-/**
- * Print a warning message.
- */
 export function warn(message: string): void {
+  if (isJsonMode()) {
+    process.stderr.write(`${message}\n`);
+    return;
+  }
   console.log(chalk.yellow("⚠") + " " + message);
 }
 
-/**
- * Print an info message.
- */
 export function info(message: string): void {
+  if (isJsonMode()) {
+    process.stderr.write(`${message}\n`);
+    return;
+  }
   console.log(chalk.blue("ℹ") + " " + message);
 }

@@ -1,5 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { formatOutput, printTable, printKeyValue } from "../lib/output.js";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { formatOutput, printTable, printKeyValue, success, warn, info } from "../lib/output.js";
+import { setJsonMode } from "../lib/runtime.js";
 
 describe("output", () => {
   let consoleSpy: ReturnType<typeof vi.spyOn>;
@@ -81,6 +82,64 @@ describe("output", () => {
       const calls = consoleSpy.mock.calls.map((c) => String(c[0]));
       expect(calls.some((c) => c.includes("ID") && c.includes("abc"))).toBe(true);
       expect(calls.some((c) => c.includes("Name") && c.includes("test"))).toBe(true);
+    });
+  });
+
+  describe("success/warn/info in JSON mode", () => {
+    let stderrSpy: ReturnType<typeof vi.spyOn>;
+
+    beforeEach(() => {
+      consoleSpy.mockClear();
+      setJsonMode(true);
+      stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    });
+
+    afterEach(() => {
+      setJsonMode(false);
+      stderrSpy.mockRestore();
+    });
+
+    it("success() writes to stderr, never stdout", () => {
+      success("ok");
+      expect(consoleSpy).not.toHaveBeenCalled();
+      expect(stderrSpy).toHaveBeenCalledWith("ok\n");
+    });
+
+    it("warn() writes to stderr, never stdout", () => {
+      warn("careful");
+      expect(consoleSpy).not.toHaveBeenCalled();
+      expect(stderrSpy).toHaveBeenCalledWith("careful\n");
+    });
+
+    it("info() writes to stderr, never stdout", () => {
+      info("fyi");
+      expect(consoleSpy).not.toHaveBeenCalled();
+      expect(stderrSpy).toHaveBeenCalledWith("fyi\n");
+    });
+  });
+
+  describe("success/warn/info in human mode", () => {
+    beforeEach(() => {
+      consoleSpy.mockClear();
+      setJsonMode(false);
+    });
+
+    it("success() prints to stdout with glyph", () => {
+      success("done");
+      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining("done"));
+      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining("✓"));
+    });
+
+    it("warn() prints to stdout with glyph", () => {
+      warn("watch");
+      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining("watch"));
+      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining("⚠"));
+    });
+
+    it("info() prints to stdout with glyph", () => {
+      info("note");
+      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining("note"));
+      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining("ℹ"));
     });
   });
 });
