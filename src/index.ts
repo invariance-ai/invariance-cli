@@ -12,6 +12,7 @@ import { configSetCommand } from "./commands/config/set.js";
 import { configSetAiKeyCommand } from "./commands/config/set-ai-key.js";
 import { configListAiKeysCommand } from "./commands/config/list-ai-keys.js";
 import { runCommand } from "./commands/run/index.js";
+import { caseCommand } from "./commands/case/index.js";
 import { nodeCommand } from "./commands/node/index.js";
 import { monitorCommand } from "./commands/monitor/index.js";
 import { signalCommand } from "./commands/signal/index.js";
@@ -79,12 +80,14 @@ export function buildProgram(): Command {
     if (!cmd.aliases().includes(alias)) cmd.alias(alias);
   };
   ensureAlias(runCommand, "runs");
+  ensureAlias(caseCommand, "cases");
   ensureAlias(nodeCommand, "nodes");
   ensureAlias(signalCommand, "signals");
   ensureAlias(findingCommand, "findings");
   ensureAlias(reviewCommand, "reviews");
 
   program.addCommand(runCommand);
+  program.addCommand(caseCommand);
   program.addCommand(nodeCommand);
   program.addCommand(monitorCommand);
   program.addCommand(signalCommand);

@@ -81,6 +81,29 @@ export const AgentSessionSchema = z.object({
 });
 export type AgentSession = z.infer<typeof AgentSessionSchema>;
 
+// ── Cases (workflow instances) ──
+
+export const CaseStatusSchema = z.enum(["open", "closed"]);
+export type CaseStatus = z.infer<typeof CaseStatusSchema>;
+
+export const CaseSchema = z.object({
+  id: z.string(),
+  agent_id: z.string(),
+  tenant_id: z.string().nullable(),
+  end_user_id: z.string().nullable(),
+  workflow_key: z.string(),
+  status: CaseStatusSchema,
+  outcome: z.string().nullable(),
+  outcome_value_usd: z.number().nullable(),
+  owner: z.string().nullable(),
+  custom_attrs: z.record(z.string(), z.unknown()),
+  opened_at: z.string(),
+  closed_at: z.string().nullable(),
+  created_at: z.string(),
+  updated_at: z.string(),
+});
+export type Case = z.infer<typeof CaseSchema>;
+
 // ── Pagination wrapper (backend emits `data` + `next_cursor`) ──
 
 export const ListSchema = <T extends z.ZodTypeAny>(item: T) =>
@@ -103,6 +126,9 @@ export const RunSchema = z.object({
   parent_run_id: z.string().nullable().optional(),
   fork_point_node_id: z.string().nullable().optional(),
   replay_seed: z.string().nullable().optional(),
+  case_id: z.string().nullable().optional(),
+  tenant_id: z.string().nullable().optional(),
+  end_user_id: z.string().nullable().optional(),
   total_input_tokens: z.number().optional(),
   total_output_tokens: z.number().optional(),
   total_cache_read: z.number().optional(),
@@ -115,6 +141,7 @@ export const RunSchema = z.object({
 });
 export type Run = z.infer<typeof RunSchema>;
 export const RunListSchema = ListSchema(RunSchema);
+export const CaseListSchema = ListSchema(CaseSchema);
 
 // ── Nodes ──
 
@@ -139,6 +166,9 @@ export const NodeSchema = z.object({
   handoff_from: z.string().nullable().optional(),
   handoff_to: z.string().nullable().optional(),
   handoff_reason: z.string().nullable().optional(),
+  case_id: z.string().nullable().optional(),
+  tenant_id: z.string().nullable().optional(),
+  end_user_id: z.string().nullable().optional(),
 });
 export type Node = z.infer<typeof NodeSchema>;
 export const NodeListSchema = ListSchema(NodeSchema);
