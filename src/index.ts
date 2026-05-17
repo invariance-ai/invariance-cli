@@ -44,12 +44,13 @@ export function buildProgram(): Command {
       "The Invariance AI command-line interface (`inv`, alias `invariance`).\n\n" +
         "Designed for agents and humans: every read command supports --json and emits\n" +
         "stable IDs so coding/ops agents can chain commands without scraping output.\n\n" +
-        "Covers runs, nodes, monitors, signals, findings, reviews, agents, metrics, eval,\n" +
+        "Covers cases, runs, nodes, monitors, signals, findings, reviews, agents, metrics, eval,\n" +
         "and stub command groups for graph/recipes/guardrails/evals (backend pending).\n\n" +
         "Get started:\n" +
         "  $ inv login\n" +
         "  $ inv status\n" +
-        "  $ inv runs list --json",
+        "  $ inv case list --json\n" +
+        "  $ inv run start --name triage --case-id case_abc --json",
     )
     .option("--json", "Output results as JSON")
     .option("--profile <name>", "Use a named configuration profile")
@@ -86,6 +87,7 @@ export function buildProgram(): Command {
   ensureAlias(findingCommand, "findings");
   ensureAlias(reviewCommand, "reviews");
 
+  program.addCommand(caseCommand);
   program.addCommand(runCommand);
   program.addCommand(caseCommand);
   program.addCommand(nodeCommand);

@@ -4,7 +4,7 @@ import { basename } from "node:path";
 import { action, parseIntFlag, printPage, printValue } from "../../lib/cmd.js";
 
 export const sessionCommand = new Command("session").description(
-  "Manage agent sessions (Claude Code, recordings, notes, meetings, etc.)",
+  "Manage source/capture sessions for compatibility (notes, meetings, recordings, coding tools)",
 );
 
 const SESSION_COLUMNS = [

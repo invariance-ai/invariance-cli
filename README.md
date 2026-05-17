@@ -1,6 +1,6 @@
 # Invariance CLI (`inv`)
 
-The official command-line interface for [Invariance AI](https://invariance.ai) — monitor, trace, and query your AI systems from the terminal.
+The official command-line interface for [Invariance AI](https://invariance.ai) — create workflow cases, attach execution evidence, and query outcomes from the terminal.
 
 The primary binary is `inv` (with `invariance` available as an alias for back-compat). Every read command supports `--json` and emits stable IDs so coding/ops agents (Claude Code, Codex, etc.) can chain commands without scraping output.
 
@@ -34,11 +34,13 @@ inv login --api-key inv_live_...
 # Confirm identity + connectivity (agent-friendly, --json-clean)
 inv status --json
 
-# Start a run, write a trace node, verify the proof chain
-RUN=$(inv runs start --name demo --json | jq -r .id)
+# Create a case for one workflow instance, then attach a run as evidence
+CASE=$(inv case create --workflow-key support.escalation --tenant-id acme --end-user-id cus_123 --json | jq -r .id)
+RUN=$(inv run start --name triage --case-id "$CASE" --json | jq -r .id)
 inv nodes write "$RUN" --action-type tool_call --input '{"x":1}' --output '{"y":2}'
-inv runs update "$RUN" --status completed
+inv run finish "$RUN"
 inv runs verify "$RUN"
+inv case close "$CASE" --outcome resolved --value-usd 250 --json
 
 # Inspect a finished run end-to-end (run + nodes in one JSON blob)
 inv runs inspect "$RUN" --json
@@ -75,7 +77,8 @@ inv doctor
 | `logout` / `auth logout` | Clear stored credentials |
 | `auth whoami` | Display the current user |
 | `config get <key>` / `set` | Read/write a config value |
-| `run start` / `list` / `get <id>` | Start, list, inspect runs |
+| `case create` / `list` / `get` / `close` | Manage workflow instances and outcomes |
+| `run start` / `list` / `get <id>` | Start, list, inspect execution evidence |
 | `run update` / `cancel` / `fork` | Mutate run state |
 | `run metrics <id>` / `verify <id>` | Aggregate metrics / verify proof chain |
 | `run narrative <id>` / `llm-calls <id>` / `nodes <id>` | LLM-generated summary, LLM call log, node list |
