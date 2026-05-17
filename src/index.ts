@@ -89,7 +89,6 @@ export function buildProgram(): Command {
 
   program.addCommand(caseCommand);
   program.addCommand(runCommand);
-  program.addCommand(caseCommand);
   program.addCommand(nodeCommand);
   program.addCommand(monitorCommand);
   program.addCommand(signalCommand);
