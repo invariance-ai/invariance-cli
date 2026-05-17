@@ -11,6 +11,14 @@ const CASE_COLUMNS = [
   { key: "opened_at", label: "Opened", width: 24 },
 ];
 
+const EVENT_COLUMNS = [
+  { key: "id", label: "ID", width: 28 },
+  { key: "type", label: "Type", width: 30 },
+  { key: "actor_type", label: "Actor", width: 12 },
+  { key: "actor_id", label: "Actor ID", width: 18 },
+  { key: "occurred_at", label: "Occurred", width: 24 },
+];
+
 export const caseCommand = new Command("case").description(
   "Inspect and manage cases — workflow instances owning many runs across time, agents, and humans (one loan, one audit, one claim)",
 );
@@ -43,6 +51,23 @@ caseCommand.addCommand(
         opened_at: opts.openedAt,
       });
       printValue(c, globals);
+    },
+  ) as Command,
+);
+
+caseCommand.addCommand(
+  action(
+    new Command("events")
+      .description("List workflow events attached to a case.")
+      .argument("<id>", "Case id")
+      .option("--limit <n>", "Page size", parseIntFlag)
+      .option("--cursor <c>", "opaque pagination token"),
+    async ({ client, globals, opts, cmd }) => {
+      const page = await client.listCaseEvents(cmd.args[0]!, {
+        cursor: opts.cursor,
+        limit: opts.limit,
+      });
+      printPage(page, EVENT_COLUMNS, globals);
     },
   ) as Command,
 );
@@ -121,7 +146,11 @@ caseCommand.addCommand(
         return;
       }
       const spinner = useSpinner ? ora("Fetching cases...").start() : null;
-      const page = await client.listCases({ cursor: opts.cursor, limit: opts.limit, ...baseFilters });
+      const page = await client.listCases({
+        cursor: opts.cursor,
+        limit: opts.limit,
+        ...baseFilters,
+      });
       spinner?.stop();
       printPage(page, CASE_COLUMNS, globals);
     },
@@ -131,9 +160,7 @@ caseCommand.addCommand(
 caseCommand.addCommand(
   action(
     new Command("get")
-      .description(
-        "Show a case with its linked runs. Output (--json): {id, ..., runs: Run[]}",
-      )
+      .description("Show a case with its linked runs. Output (--json): {id, ..., runs: Run[]}")
       .argument("<id>", "Case id, e.g. case_abc123"),
     async ({ client, globals, cmd }) => {
       printValue(await client.getCase(cmd.args[0]!), globals);
@@ -144,7 +171,9 @@ caseCommand.addCommand(
 caseCommand.addCommand(
   action(
     new Command("update")
-      .description("Update a case (status, owner, custom_attrs). Outcome is only valid when status=closed.")
+      .description(
+        "Update a case (status, owner, custom_attrs). Outcome is only valid when status=closed.",
+      )
       .argument("<id>")
       .option("--status <s>", "open | closed")
       .option("--outcome <o>")
@@ -166,7 +195,9 @@ caseCommand.addCommand(
 caseCommand.addCommand(
   action(
     new Command("close")
-      .description("Close a case with an outcome. Sugar for `case update <id> --status closed --outcome <o>`.")
+      .description(
+        "Close a case with an outcome. Sugar for `case update <id> --status closed --outcome <o>`.",
+      )
       .argument("<id>")
       .requiredOption("--outcome <o>", 'e.g. "approved", "denied", "escalated"')
       .option("--value-usd <n>", "Realized $ value", parseFloat),
