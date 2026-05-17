@@ -349,6 +349,7 @@ export class InvarianceClient {
   // ── Cases (workflow instances) ──
 
   async createCase(input: {
+    id?: string;
     workflow_key: string;
     tenant_id?: string;
     end_user_id?: string;
@@ -399,6 +400,19 @@ export class InvarianceClient {
       { body: patch },
     );
     return CaseSchema.parse(res.case);
+  }
+
+  async caseEvidence(id: string): Promise<unknown> {
+    return this.request("GET", `/v1/cases/${encodeURIComponent(id)}/evidence`);
+  }
+
+  async createCaseEvent(id: string, body: Record<string, unknown>): Promise<unknown> {
+    const res = await this.request<{ event: unknown }>(
+      "POST",
+      `/v1/cases/${encodeURIComponent(id)}/events`,
+      { body },
+    );
+    return res.event;
   }
 
   // ── Runs ──

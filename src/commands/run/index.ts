@@ -24,7 +24,7 @@ const NODE_COLUMNS = [
 const LATEST_HELP =
   "Run id; pass `latest` to resolve to the most recently created run for the current agent.";
 
-export const runCommand = new Command("run").description("Inspect and manage runs (agent execution sessions)");
+export const runCommand = new Command("run").description("Inspect and manage runs as execution evidence attached to cases/workflows");
 
 runCommand.addCommand(
   action(
@@ -34,12 +34,12 @@ runCommand.addCommand(
       )
       .option("--name <name>", "Run name")
       .option("--metadata <json>", "Metadata JSON object")
-      .option("--case-id <id>", "Case (workflow instance) this run belongs to; server inherits tenant_id/end_user_id from the case")
+      .option("--case-id <id>", "Case/workflow instance this run is evidence for")
       .option("--tenant-id <id>", "Override tenant_id (normally inherited from case)")
       .option("--end-user-id <id>", "Override end_user_id (normally inherited from case)")
       .addHelpText(
         "after",
-        "\nExample:\n  $ invariance run start --name 'nightly-eval' --metadata '{\"env\":\"prod\"}'\n  $ invariance run start --name 'underwrite' --case-id case_abc123\n",
+        "\nExample:\n  $ inv case create --workflow-key support.escalation --tenant-id acme --json\n  $ inv run start --name triage --case-id case_abc123 --json\n",
       ),
     async ({ client, globals, opts }) => {
       const run = await client.startRun({

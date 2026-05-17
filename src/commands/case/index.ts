@@ -49,6 +49,43 @@ caseCommand.addCommand(
 
 caseCommand.addCommand(
   action(
+    new Command("evidence")
+      .description("Show normalized case evidence: case, runs, nodes, events, actors, and outcome.")
+      .argument("<id>", "Case id, e.g. case_abc123"),
+    async ({ client, globals, cmd }) => {
+      printValue(await client.caseEvidence(cmd.args[0]!), globals);
+    },
+  ) as Command,
+);
+
+caseCommand.addCommand(
+  action(
+    new Command("event")
+      .description("Attach a lightweight workflow event to a case.")
+      .argument("<id>", "Case id")
+      .requiredOption("--type <type>", "Event type, e.g. approval.requested")
+      .option("--actor-type <type>", "human|agent|llm|service|integration|system")
+      .option("--actor-id <id>", "Actor identifier")
+      .option("--payload <json>", "Event payload JSON object")
+      .option("--evidence-node-ids <csv>", "Comma-separated node ids"),
+    async ({ client, globals, opts, cmd }) => {
+      const body: Record<string, unknown> = { type: opts.type };
+      if (opts.actorType !== undefined) body.actor_type = opts.actorType;
+      if (opts.actorId !== undefined) body.actor_id = opts.actorId;
+      if (opts.payload !== undefined) body.payload = parseJsonFlag("payload", opts.payload);
+      if (opts.evidenceNodeIds !== undefined) {
+        body.evidence_node_ids = String(opts.evidenceNodeIds)
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean);
+      }
+      printValue(await client.createCaseEvent(cmd.args[0]!, body), globals);
+    },
+  ) as Command,
+);
+
+caseCommand.addCommand(
+  action(
     new Command("list")
       .description(
         "List cases. Output (--json): {data: Case[], next_cursor}. Filter by tenant, workflow, status, or outcome.",
