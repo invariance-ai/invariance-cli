@@ -1,10 +1,11 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import {
   dashboardBaseUrl,
   startLoopbackServer,
   loginCommand,
   makeLoginCommand,
 } from "../commands/auth/login.js";
+import { setJsonMode } from "../lib/runtime.js";
 
 describe("dashboardBaseUrl", () => {
   it("maps api.useinvariance.com to app.useinvariance.com", () => {
@@ -74,6 +75,53 @@ describe("startLoopbackServer", () => {
     } finally {
       close();
     }
+  });
+});
+
+describe("login --bootstrap failure in --json mode", () => {
+  afterEach(() => {
+    setJsonMode(false);
+    vi.restoreAllMocks();
+  });
+
+  it("emits a structured JSON error envelope on bootstrap redeem failure", async () => {
+    setJsonMode(true);
+
+    const stderrChunks: string[] = [];
+    const stderrSpy = vi
+      .spyOn(process.stderr, "write")
+      .mockImplementation((chunk: string | Uint8Array) => {
+        stderrChunks.push(typeof chunk === "string" ? chunk : Buffer.from(chunk).toString());
+        return true;
+      });
+    const exitSpy = vi
+      .spyOn(process, "exit")
+      .mockImplementation(((_code?: number) => {
+        throw new Error("__exit__");
+      }) as never);
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({ error: { message: "token expired" } }),
+        { status: 400, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+
+    const cmd = makeLoginCommand("login");
+    await expect(
+      cmd.parseAsync(["node", "login", "--bootstrap", "invbts_bad"]),
+    ).rejects.toThrow("__exit__");
+
+    const envelope = stderrChunks.find((c) => c.includes('"error"'));
+    expect(envelope, "expected a JSON error envelope on stderr").toBeDefined();
+    const parsed = JSON.parse(envelope!.trim());
+    expect(parsed.error.code).toBe("BOOTSTRAP_REDEEM_FAILED");
+    expect(typeof parsed.error.message).toBe("string");
+    expect(parsed.error.message.length).toBeGreaterThan(0);
+    expect(exitSpy).toHaveBeenCalledWith(1);
+
+    fetchSpy.mockRestore();
+    stderrSpy.mockRestore();
+    exitSpy.mockRestore();
   });
 });
 

@@ -10,7 +10,8 @@ import { URL } from "node:url";
 import { resolveConfig, saveApiKey } from "../../lib/config.js";
 import { validateApiKey } from "../../lib/auth.js";
 import { success } from "../../lib/output.js";
-import { handleError } from "../../lib/errors.js";
+import { handleError, InvarianceError } from "../../lib/errors.js";
+import { isJsonMode } from "../../lib/runtime.js";
 
 interface LoopbackResult {
   token?: string;
@@ -223,7 +224,32 @@ type LoginOptions = {
   browser?: boolean;
   paste?: boolean;
   open?: boolean;
+  bootstrap?: string;
 };
+
+interface RedeemedBootstrap {
+  api_key: { key: string; id: string; agent_id: string };
+}
+
+async function redeemBootstrap(token: string, baseUrl: string): Promise<string> {
+  const res = await fetch(`${baseUrl.replace(/\/+$/, '')}/v1/api-keys/bootstrap/redeem`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token, label: `cli-${hostname()}` }),
+  });
+  if (!res.ok) {
+    let detail = `HTTP ${res.status}`;
+    try {
+      const body = await res.json();
+      const msg = (body as { error?: { message?: string } })?.error?.message;
+      if (msg) detail = msg;
+    } catch { /* ignore */ }
+    throw new Error(`Bootstrap redeem failed: ${detail}`);
+  }
+  const body = (await res.json()) as RedeemedBootstrap;
+  if (!body.api_key?.key) throw new Error('Bootstrap redeem returned no API key');
+  return body.api_key.key;
+}
 
 const MAX_PASTE_ATTEMPTS = 3;
 
@@ -273,7 +299,26 @@ async function runLogin(options: LoginOptions): Promise<void> {
     let apiKey: string;
     let alreadyValidated = false;
 
-    if (options.apiKey) {
+    if (options.bootstrap) {
+      // Headless agent path: redeem a one-time bootstrap token a human issued
+      // from the dashboard. The redeemed API key is already validated server-
+      // side, so we save it directly.
+      const spinner = isJsonMode()
+        ? null
+        : ora('Redeeming bootstrap token...').start();
+      try {
+        apiKey = await redeemBootstrap(options.bootstrap, config.baseUrl);
+        spinner?.succeed('Bootstrap token redeemed; API key minted.');
+        alreadyValidated = true;
+      } catch (err) {
+        spinner?.fail((err as Error).message);
+        // Rethrow so the outer catch routes through handleError(), which
+        // emits a structured JSON envelope in --json mode.
+        throw err instanceof Error
+          ? new InvarianceError(err.message, 'BOOTSTRAP_REDEEM_FAILED')
+          : new InvarianceError('Bootstrap redeem failed', 'BOOTSTRAP_REDEEM_FAILED');
+      }
+    } else if (options.apiKey) {
       apiKey = options.apiKey;
     } else if (options.paste) {
       apiKey = await pasteLoginWithRetries(config.baseUrl);
@@ -327,6 +372,7 @@ export function makeLoginCommand(name: string): Command {
     .option("--browser", "Use the browser flow (this is the default)")
     .option("--paste", "Paste an API key at a terminal prompt (for headless/SSH)")
     .option("--no-open", "Print the sign-in URL instead of auto-opening the browser")
+    .option("--bootstrap <token>", "Redeem a one-time bootstrap token (for agent self-onboarding; token issued by a human from the dashboard)")
     .addHelpText(
       "after",
       `
@@ -335,6 +381,7 @@ Examples:
   $ invariance login --paste               # paste a key at a prompt (SSH / headless)
   $ invariance login --profile staging     # save under a named profile
   $ invariance login --api-key inv_live_...# non-interactive, e.g. CI
+  $ invariance login --bootstrap invbts_... # agent self-onboard from a one-time token
 
 The browser flow opens your dashboard, where you approve this device and
 the key is returned to a loopback listener (http://127.0.0.1:<random port>).
