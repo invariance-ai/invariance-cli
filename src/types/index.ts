@@ -104,6 +104,118 @@ export const CaseSchema = z.object({
 });
 export type Case = z.infer<typeof CaseSchema>;
 
+// ── Workflow events / definitions ──
+
+export const WorkflowEventActorTypeSchema = z.enum([
+  "human",
+  "agent",
+  "llm",
+  "service",
+  "integration",
+  "policy",
+  "system",
+]);
+export type WorkflowEventActorType = z.infer<typeof WorkflowEventActorTypeSchema>;
+
+export const EvidenceRefKindSchema = z.enum([
+  "run",
+  "node",
+  "ticket",
+  "doc",
+  "slack",
+  "github",
+  "meeting",
+  "url",
+  "external",
+]);
+export type EvidenceRefKind = z.infer<typeof EvidenceRefKindSchema>;
+
+export const WorkflowEvidenceRefSchema = z.object({
+  kind: EvidenceRefKindSchema,
+  id: z.string().optional(),
+  url: z.string().optional(),
+  label: z.string().optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+});
+export type WorkflowEvidenceRef = z.infer<typeof WorkflowEvidenceRefSchema>;
+
+export const WorkflowEventSchema = z.object({
+  id: z.string(),
+  case_id: z.string(),
+  agent_id: z.string(),
+  tenant_id: z.string().nullable(),
+  end_user_id: z.string().nullable(),
+  type: z.string(),
+  actor_type: WorkflowEventActorTypeSchema.nullable(),
+  actor_id: z.string().nullable(),
+  payload: z.record(z.string(), z.unknown()),
+  evidence_node_ids: z.array(z.string()),
+  evidence_refs: z.array(WorkflowEvidenceRefSchema),
+  occurred_at: z.string(),
+  created_at: z.string(),
+});
+export type WorkflowEvent = z.infer<typeof WorkflowEventSchema>;
+
+export const WorkflowFieldTypeSchema = z.enum([
+  "string",
+  "number",
+  "boolean",
+  "datetime",
+  "url",
+  "currency_usd",
+  "enum",
+]);
+export type WorkflowFieldType = z.infer<typeof WorkflowFieldTypeSchema>;
+
+export const WorkflowDefinitionFieldSchema = z.object({
+  name: z.string(),
+  label: z.string().optional(),
+  type: WorkflowFieldTypeSchema,
+  required: z.boolean().optional(),
+  enum: z.array(z.string()).optional(),
+  description: z.string().optional(),
+});
+export type WorkflowDefinitionField = z.infer<typeof WorkflowDefinitionFieldSchema>;
+
+export const WorkflowDefinitionStepSchema = z.object({
+  type: z.string(),
+  label: z.string().optional(),
+  required: z.boolean().optional(),
+  description: z.string().optional(),
+});
+export type WorkflowDefinitionStep = z.infer<typeof WorkflowDefinitionStepSchema>;
+
+export const WorkflowOutcomeKindSchema = z.enum(["success", "failure", "neutral"]);
+export type WorkflowOutcomeKind = z.infer<typeof WorkflowOutcomeKindSchema>;
+
+export const WorkflowDefinitionOutcomeSchema = z.object({
+  value: z.string(),
+  label: z.string().optional(),
+  kind: WorkflowOutcomeKindSchema.optional(),
+});
+export type WorkflowDefinitionOutcome = z.infer<typeof WorkflowDefinitionOutcomeSchema>;
+
+export const WorkflowMetricWidgetSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("count"), label: z.string(), event_type: z.string().optional() }),
+  z.object({ kind: z.literal("sum_field"), label: z.string(), field: z.string() }),
+  z.object({ kind: z.literal("avg_field"), label: z.string(), field: z.string() }),
+]);
+export type WorkflowMetricWidget = z.infer<typeof WorkflowMetricWidgetSchema>;
+
+export const WorkflowDefinitionSchema = z.object({
+  key: z.string(),
+  agent_id: z.string(),
+  display_name: z.string(),
+  description: z.string().nullable(),
+  expected_fields: z.array(WorkflowDefinitionFieldSchema),
+  expected_steps: z.array(WorkflowDefinitionStepSchema),
+  allowed_outcomes: z.array(WorkflowDefinitionOutcomeSchema),
+  custom_metrics: z.array(WorkflowMetricWidgetSchema),
+  created_at: z.string(),
+  updated_at: z.string(),
+});
+export type WorkflowDefinition = z.infer<typeof WorkflowDefinitionSchema>;
+
 // ── Pagination wrapper (backend emits `data` + `next_cursor`) ──
 
 export const ListSchema = <T extends z.ZodTypeAny>(item: T) =>
@@ -142,6 +254,7 @@ export const RunSchema = z.object({
 export type Run = z.infer<typeof RunSchema>;
 export const RunListSchema = ListSchema(RunSchema);
 export const CaseListSchema = ListSchema(CaseSchema);
+export const WorkflowEventListSchema = ListSchema(WorkflowEventSchema);
 
 // ── Nodes ──
 
@@ -267,12 +380,7 @@ export const SignalListSchema = ListSchema(SignalSchema);
 
 // ── Findings ──
 
-export const FindingStatusSchema = z.enum([
-  "open",
-  "review_requested",
-  "resolved",
-  "dismissed",
-]);
+export const FindingStatusSchema = z.enum(["open", "review_requested", "resolved", "dismissed"]);
 export type FindingStatus = z.infer<typeof FindingStatusSchema>;
 
 export const FindingSchema = z.object({
@@ -418,12 +526,7 @@ export interface ScorerSpec {
   config?: Record<string, unknown>;
 }
 
-export type EvalRunStatus =
-  | "queued"
-  | "running"
-  | "passed"
-  | "failed"
-  | "errored";
+export type EvalRunStatus = "queued" | "running" | "passed" | "failed" | "errored";
 
 export interface EvalRunRecord {
   id: string;

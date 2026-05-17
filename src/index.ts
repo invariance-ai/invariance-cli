@@ -13,6 +13,8 @@ import { configSetAiKeyCommand } from "./commands/config/set-ai-key.js";
 import { configListAiKeysCommand } from "./commands/config/list-ai-keys.js";
 import { runCommand } from "./commands/run/index.js";
 import { caseCommand } from "./commands/case/index.js";
+import { workflowCommand } from "./commands/workflow/index.js";
+import { eventCommand } from "./commands/event/index.js";
 import { nodeCommand } from "./commands/node/index.js";
 import { monitorCommand } from "./commands/monitor/index.js";
 import { signalCommand } from "./commands/signal/index.js";
@@ -44,7 +46,7 @@ export function buildProgram(): Command {
       "The Invariance AI command-line interface (`inv`, alias `invariance`).\n\n" +
         "Designed for agents and humans: every read command supports --json and emits\n" +
         "stable IDs so coding/ops agents can chain commands without scraping output.\n\n" +
-        "Covers cases, runs, nodes, monitors, signals, findings, reviews, agents, metrics, eval,\n" +
+        "Covers workflows, cases, events, runs, nodes, monitors, signals, findings, reviews, agents, metrics, eval,\n" +
         "and stub command groups for graph/recipes/guardrails/evals (backend pending).\n\n" +
         "Get started:\n" +
         "  $ inv login\n" +
@@ -82,12 +84,16 @@ export function buildProgram(): Command {
   };
   ensureAlias(runCommand, "runs");
   ensureAlias(caseCommand, "cases");
+  ensureAlias(workflowCommand, "workflows");
+  ensureAlias(eventCommand, "events");
   ensureAlias(nodeCommand, "nodes");
   ensureAlias(signalCommand, "signals");
   ensureAlias(findingCommand, "findings");
   ensureAlias(reviewCommand, "reviews");
 
   program.addCommand(caseCommand);
+  program.addCommand(workflowCommand);
+  program.addCommand(eventCommand);
   program.addCommand(runCommand);
   program.addCommand(nodeCommand);
   program.addCommand(monitorCommand);

@@ -26,6 +26,9 @@ describe("command wiring", () => {
     for (const expected of [
       "auth",
       "config",
+      "workflow",
+      "event",
+      "case",
       "run",
       "node",
       "monitor",
@@ -45,16 +48,104 @@ describe("command wiring", () => {
     }
   });
 
+  it("workflow create posts workflow definitions", async () => {
+    process.env.INVARIANCE_API_KEY = "inv_test_key";
+    process.env.INVARIANCE_BASE_URL = "https://api.test";
+    const definition = {
+      key: "support.escalation",
+      agent_id: "agent_1",
+      display_name: "Support Escalation",
+      description: null,
+      expected_fields: [],
+      expected_steps: [],
+      allowed_outcomes: [],
+      custom_metrics: [],
+      created_at: "2026-01-01T00:00:00.000Z",
+      updated_at: "2026-01-01T00:00:00.000Z",
+    };
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(JSON.stringify({ definition }), {
+        status: 201,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    const writes: string[] = [];
+    const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation((chunk: unknown) => {
+      writes.push(String(chunk));
+      return true;
+    });
+    const program = buildProgram();
+    program.exitOverride();
+
+    await program.parseAsync(
+      [
+        "--json",
+        "workflow",
+        "create",
+        "--key",
+        "support.escalation",
+        "--display-name",
+        "Support Escalation",
+        "--expected-fields",
+        '[{"name":"priority","type":"enum","enum":["p0","p1"]}]',
+      ],
+      { from: "user" },
+    );
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(String(fetchSpy.mock.calls[0]?.[0])).toBe("https://api.test/v1/workflow-definitions");
+    expect(fetchSpy.mock.calls[0]?.[1]).toMatchObject({ method: "POST" });
+    expect(JSON.parse(String(fetchSpy.mock.calls[0]?.[1]?.body))).toEqual({
+      key: "support.escalation",
+      display_name: "Support Escalation",
+      expected_fields: [{ name: "priority", type: "enum", enum: ["p0", "p1"] }],
+    });
+    expect(JSON.parse(writes.join("").trimEnd())).toEqual(definition);
+    writeSpy.mockRestore();
+  });
+
+  it("event list filters /v1/events", async () => {
+    process.env.INVARIANCE_API_KEY = "inv_test_key";
+    process.env.INVARIANCE_BASE_URL = "https://api.test";
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(JSON.stringify({ data: [], next_cursor: null }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    const program = buildProgram();
+    program.exitOverride();
+
+    await program.parseAsync(
+      [
+        "--json",
+        "event",
+        "list",
+        "--workflow-key",
+        "support.escalation",
+        "--actor-type",
+        "human",
+        "--limit",
+        "5",
+      ],
+      { from: "user" },
+    );
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(String(fetchSpy.mock.calls[0]?.[0])).toBe(
+      "https://api.test/v1/events?limit=5&workflow_key=support.escalation&actor_type=human",
+    );
+    writeSpy.mockRestore();
+  });
+
   it("every group's subcommands match the completions table (no drift)", () => {
     const byName = new Map(buildProgram().commands.map((c) => [c.name(), c]));
     for (const [group, advertised] of Object.entries(COMMANDS)) {
       if (group === "completions") continue;
       const cmd = byName.get(group);
       expect(cmd, `completions references unknown group "${group}"`).toBeDefined();
-      expect(
-        subs(cmd!),
-        `drift for "${group}"`,
-      ).toEqual([...advertised].sort());
+      expect(subs(cmd!), `drift for "${group}"`).toEqual([...advertised].sort());
     }
   });
 
@@ -84,25 +175,17 @@ describe("command wiring", () => {
       }),
     );
     const writes: string[] = [];
-    const writeSpy = vi
-      .spyOn(process.stdout, "write")
-      .mockImplementation((chunk: unknown) => {
-        writes.push(String(chunk));
-        return true;
-      });
+    const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation((chunk: unknown) => {
+      writes.push(String(chunk));
+      return true;
+    });
     const program = buildProgram();
     program.exitOverride();
 
-    await program.parseAsync([
-      "--json",
-      "dna",
-      "query",
-      "Acme discharge",
-      "--kind",
-      "patient",
-      "--limit",
-      "5",
-    ], { from: "user" });
+    await program.parseAsync(
+      ["--json", "dna", "query", "Acme discharge", "--kind", "patient", "--limit", "5"],
+      { from: "user" },
+    );
 
     expect(fetchSpy).toHaveBeenCalledTimes(1);
     expect(String(fetchSpy.mock.calls[0]?.[0])).toBe("https://api.test/v1/dna/query");
@@ -146,12 +229,10 @@ describe("command wiring", () => {
       }),
     );
     const writes: string[] = [];
-    const writeSpy = vi
-      .spyOn(process.stdout, "write")
-      .mockImplementation((chunk: unknown) => {
-        writes.push(String(chunk));
-        return true;
-      });
+    const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation((chunk: unknown) => {
+      writes.push(String(chunk));
+      return true;
+    });
     const program = buildProgram();
     program.exitOverride();
 
@@ -160,9 +241,7 @@ describe("command wiring", () => {
     });
 
     expect(fetchSpy).toHaveBeenCalledTimes(1);
-    expect(String(fetchSpy.mock.calls[0]?.[0])).toBe(
-      "https://api.test/v1/runs/run_1/nodes",
-    );
+    expect(String(fetchSpy.mock.calls[0]?.[0])).toBe("https://api.test/v1/runs/run_1/nodes");
     const out = writes.join("");
     expect(out.endsWith("\n")).toBe(true);
     expect(JSON.parse(out.trimEnd())).toEqual(node);
@@ -201,18 +280,13 @@ describe("command wiring", () => {
       }),
     );
     const writes: string[] = [];
-    const logSpy = vi
-      .spyOn(console, "log")
-      .mockImplementation((...args: unknown[]) => {
-        writes.push(args.map((a) => (typeof a === "string" ? a : String(a))).join(" "));
-      });
+    const logSpy = vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => {
+      writes.push(args.map((a) => (typeof a === "string" ? a : String(a))).join(" "));
+    });
     const program = buildProgram();
     program.exitOverride();
 
-    await program.parseAsync(
-      ["--json", "finding", "list", "--status", "open"],
-      { from: "user" },
-    );
+    await program.parseAsync(["--json", "finding", "list", "--status", "open"], { from: "user" });
 
     expect(fetchSpy).toHaveBeenCalledTimes(1);
     // formatOutput uses console.log with pretty-printed JSON. Joining all log
@@ -322,12 +396,10 @@ describe("command wiring", () => {
       .mockImplementation(async (input: RequestInfo | URL) => respond(String(input)));
 
     const writes: string[] = [];
-    const writeSpy = vi
-      .spyOn(process.stdout, "write")
-      .mockImplementation((chunk: unknown) => {
-        writes.push(String(chunk));
-        return true;
-      });
+    const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation((chunk: unknown) => {
+      writes.push(String(chunk));
+      return true;
+    });
 
     const program = buildProgram();
     program.exitOverride();

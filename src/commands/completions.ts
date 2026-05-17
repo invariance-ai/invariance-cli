@@ -3,9 +3,39 @@ import { Command } from "commander";
 export const COMMANDS: Record<string, string[]> = {
   auth: ["login", "logout", "whoami", "signup", "signin", "refresh", "issue-key"],
   config: ["get", "list-ai-keys", "set", "set-ai-key"],
-  run: ["start", "list", "get", "update", "finish", "cancel", "fork", "metrics", "verify", "narrative", "llm-calls", "nodes", "inspect", "open", "export"],
+  workflow: ["list", "get", "create", "update", "delete"],
+  event: ["list"],
+  case: ["create", "evidence", "event", "events", "list", "get", "update", "close"],
+  run: [
+    "start",
+    "list",
+    "get",
+    "update",
+    "finish",
+    "cancel",
+    "fork",
+    "metrics",
+    "verify",
+    "narrative",
+    "llm-calls",
+    "nodes",
+    "inspect",
+    "open",
+    "export",
+  ],
   node: ["write", "list", "tail"],
-  monitor: ["create", "list", "get", "update", "pause", "resume", "delete", "evaluate", "executions", "findings"],
+  monitor: [
+    "create",
+    "list",
+    "get",
+    "update",
+    "pause",
+    "resume",
+    "delete",
+    "evaluate",
+    "executions",
+    "findings",
+  ],
   signal: ["emit", "list", "get", "ack", "resolve"],
   finding: ["list", "get", "update"],
   review: ["list", "get", "claim", "unclaim", "resolve"],
@@ -23,13 +53,7 @@ export const COMMANDS: Record<string, string[]> = {
   completions: ["bash", "zsh", "fish"],
 };
 
-const TOP_LEVEL = [
-  ...Object.keys(COMMANDS),
-  "login",
-  "logout",
-  "doctor",
-  "version",
-];
+const TOP_LEVEL = [...Object.keys(COMMANDS), "login", "logout", "doctor", "version"];
 
 function bashCompletionScript(): string {
   const subcommandCases = Object.entries(COMMANDS)
@@ -133,9 +157,7 @@ Examples:
         console.log(fishCompletionScript());
         break;
       default:
-        console.error(
-          `Unknown shell: ${shell}. Supported shells: bash, zsh, fish`,
-        );
+        console.error(`Unknown shell: ${shell}. Supported shells: bash, zsh, fish`);
         process.exit(1);
     }
   });

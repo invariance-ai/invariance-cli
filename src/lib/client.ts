@@ -2,8 +2,14 @@ import {
   MeSchema,
   CaseSchema,
   CaseListSchema,
+  WorkflowDefinitionSchema,
+  WorkflowEventListSchema,
+  WorkflowEventSchema,
   type Case,
   type CaseStatus,
+  type WorkflowDefinition,
+  type WorkflowEvent,
+  type WorkflowEventActorType,
   RunSchema,
   RunListSchema,
   RunProofSchema,
@@ -63,12 +69,7 @@ import {
   type DnaEdgeExplain,
   type DnaQueryResponse,
 } from "../types/index.js";
-import {
-  ApiError,
-  AuthenticationError,
-  NetworkError,
-  NotFoundError,
-} from "./errors.js";
+import { ApiError, AuthenticationError, NetworkError, NotFoundError } from "./errors.js";
 import {
   MemoryReadResponseSchema,
   MemoryWriteResponseSchema,
@@ -197,7 +198,11 @@ export class InvarianceClient {
     return AgentSchema.parse(res.agent);
   }
 
-  async createAgent(input: { name: string; project_id: string; public_key?: string }): Promise<Agent> {
+  async createAgent(input: {
+    name: string;
+    project_id: string;
+    public_key?: string;
+  }): Promise<Agent> {
     const res = await this.request<{ agent: unknown }>("POST", "/v1/agents", {
       body: input,
     });
@@ -212,7 +217,9 @@ export class InvarianceClient {
     return this.request("GET", "/v1/auth/me");
   }
 
-  async issueCliToken(input: { hostname?: string; project_id?: string; expires_in_days?: number } = {}): Promise<{
+  async issueCliToken(
+    input: { hostname?: string; project_id?: string; expires_in_days?: number } = {},
+  ): Promise<{
     api_key_once: string;
     agent: Agent;
     project_id: string;
@@ -266,9 +273,7 @@ export class InvarianceClient {
     const res = await this.request<{ operator: unknown }>("POST", "/v1/operators", {
       body: input,
     });
-    return OperatorSchema.parse(
-      (res as { operator?: unknown }).operator ?? res,
-    );
+    return OperatorSchema.parse((res as { operator?: unknown }).operator ?? res);
   }
 
   // ── Agent sessions ──
@@ -283,14 +288,10 @@ export class InvarianceClient {
     run_id?: string;
     metadata?: Record<string, unknown>;
   }): Promise<AgentSession> {
-    const res = await this.request<{ session: unknown }>(
-      "POST",
-      "/v1/agent-sessions",
-      { body: input },
-    );
-    return AgentSessionSchema.parse(
-      (res as { session?: unknown }).session ?? res,
-    );
+    const res = await this.request<{ session: unknown }>("POST", "/v1/agent-sessions", {
+      body: input,
+    });
+    return AgentSessionSchema.parse((res as { session?: unknown }).session ?? res);
   }
 
   async listAgentSessions(
@@ -323,10 +324,7 @@ export class InvarianceClient {
     return AgentSessionSchema.parse(res.session);
   }
 
-  async updateAgentSession(
-    id: string,
-    patch: Record<string, unknown>,
-  ): Promise<AgentSession> {
+  async updateAgentSession(id: string, patch: Record<string, unknown>): Promise<AgentSession> {
     const res = await this.request<{ session: unknown }>(
       "PATCH",
       `/v1/agent-sessions/${encodeURIComponent(id)}`,
@@ -335,15 +333,10 @@ export class InvarianceClient {
     return AgentSessionSchema.parse(res.session);
   }
 
-  async writeAgentSessionEvents(
-    id: string,
-    events: Record<string, unknown>[],
-  ): Promise<unknown> {
-    return this.request(
-      "POST",
-      `/v1/agent-sessions/${encodeURIComponent(id)}/events`,
-      { body: events },
-    );
+  async writeAgentSessionEvents(id: string, events: Record<string, unknown>[]): Promise<unknown> {
+    return this.request("POST", `/v1/agent-sessions/${encodeURIComponent(id)}/events`, {
+      body: events,
+    });
   }
 
   // ── Cases (workflow instances) ──
@@ -386,10 +379,7 @@ export class InvarianceClient {
   async getCase(id: string): Promise<unknown> {
     // Returns CaseWithRuns — schema-parsed as a plain object since the runs
     // array is large enough that a tight schema adds little value at the CLI.
-    const res = await this.request<{ case: unknown }>(
-      "GET",
-      `/v1/cases/${encodeURIComponent(id)}`,
-    );
+    const res = await this.request<{ case: unknown }>("GET", `/v1/cases/${encodeURIComponent(id)}`);
     return res.case;
   }
 
@@ -406,13 +396,90 @@ export class InvarianceClient {
     return this.request("GET", `/v1/cases/${encodeURIComponent(id)}/evidence`);
   }
 
-  async createCaseEvent(id: string, body: Record<string, unknown>): Promise<unknown> {
+  async createCaseEvent(id: string, body: Record<string, unknown>): Promise<WorkflowEvent> {
     const res = await this.request<{ event: unknown }>(
       "POST",
       `/v1/cases/${encodeURIComponent(id)}/events`,
       { body },
     );
-    return res.event;
+    return WorkflowEventSchema.parse(res.event);
+  }
+
+  async listCaseEvents(id: string, opts: PageOptions = {}): Promise<Page<WorkflowEvent>> {
+    return this.parsed(
+      WorkflowEventListSchema,
+      "GET",
+      `/v1/cases/${encodeURIComponent(id)}/events`,
+      {
+        params: { cursor: opts.cursor, limit: opts.limit },
+      },
+    );
+  }
+
+  async listWorkflowEvents(
+    opts: PageOptions & {
+      case_id?: string;
+      tenant_id?: string;
+      end_user_id?: string;
+      workflow_key?: string;
+      type?: string;
+      actor_type?: WorkflowEventActorType;
+      actor_id?: string;
+      from?: string;
+      to?: string;
+    } = {},
+  ): Promise<Page<WorkflowEvent>> {
+    return this.parsed(WorkflowEventListSchema, "GET", "/v1/events", {
+      params: {
+        cursor: opts.cursor,
+        limit: opts.limit,
+        case_id: opts.case_id,
+        tenant_id: opts.tenant_id,
+        end_user_id: opts.end_user_id,
+        workflow_key: opts.workflow_key,
+        type: opts.type,
+        actor_type: opts.actor_type,
+        actor_id: opts.actor_id,
+        from: opts.from,
+        to: opts.to,
+      },
+    });
+  }
+
+  async createWorkflowDefinition(input: Record<string, unknown>): Promise<WorkflowDefinition> {
+    const res = await this.request<{ definition: unknown }>("POST", "/v1/workflow-definitions", {
+      body: input,
+    });
+    return WorkflowDefinitionSchema.parse(res.definition);
+  }
+
+  async listWorkflowDefinitions(): Promise<WorkflowDefinition[]> {
+    const res = await this.request<{ data: unknown[] }>("GET", "/v1/workflow-definitions");
+    return res.data.map((d) => WorkflowDefinitionSchema.parse(d));
+  }
+
+  async getWorkflowDefinition(key: string): Promise<WorkflowDefinition> {
+    const res = await this.request<{ definition: unknown }>(
+      "GET",
+      `/v1/workflow-definitions/${encodeURIComponent(key)}`,
+    );
+    return WorkflowDefinitionSchema.parse(res.definition);
+  }
+
+  async updateWorkflowDefinition(
+    key: string,
+    patch: Record<string, unknown>,
+  ): Promise<WorkflowDefinition> {
+    const res = await this.request<{ definition: unknown }>(
+      "PATCH",
+      `/v1/workflow-definitions/${encodeURIComponent(key)}`,
+      { body: patch },
+    );
+    return WorkflowDefinitionSchema.parse(res.definition);
+  }
+
+  async deleteWorkflowDefinition(key: string): Promise<void> {
+    await this.request<void>("DELETE", `/v1/workflow-definitions/${encodeURIComponent(key)}`);
   }
 
   // ── Runs ──
@@ -428,19 +495,14 @@ export class InvarianceClient {
     return RunSchema.parse(res.run);
   }
 
-  async listRuns(
-    opts: PageOptions & { eval_suite?: string } = {},
-  ): Promise<Page<Run>> {
+  async listRuns(opts: PageOptions & { eval_suite?: string } = {}): Promise<Page<Run>> {
     return this.parsed(RunListSchema, "GET", "/v1/runs", {
       params: { cursor: opts.cursor, limit: opts.limit, eval_suite: opts.eval_suite },
     });
   }
 
   async getRun(id: string): Promise<Run> {
-    const res = await this.request<{ run: unknown }>(
-      "GET",
-      `/v1/runs/${encodeURIComponent(id)}`,
-    );
+    const res = await this.request<{ run: unknown }>("GET", `/v1/runs/${encodeURIComponent(id)}`);
     return RunSchema.parse(res.run);
   }
 
@@ -620,9 +682,7 @@ export class InvarianceClient {
 
   // ── Findings ──
 
-  async listFindings(
-    opts: PageOptions & { run_id?: string } = {},
-  ): Promise<Page<Finding>> {
+  async listFindings(opts: PageOptions & { run_id?: string } = {}): Promise<Page<Finding>> {
     return this.parsed(FindingListSchema, "GET", "/v1/findings", {
       params: { cursor: opts.cursor, limit: opts.limit, run_id: opts.run_id },
     });
@@ -682,11 +742,7 @@ export class InvarianceClient {
     return this.patchReview(id, { status: "pending", ...(notes ? { notes } : {}) });
   }
 
-  async resolveReview(
-    id: string,
-    decision: ReviewDecision,
-    notes?: string,
-  ): Promise<Review> {
+  async resolveReview(id: string, decision: ReviewDecision, notes?: string): Promise<Review> {
     return this.patchReview(id, { decision, ...(notes ? { notes } : {}) });
   }
 
@@ -731,11 +787,9 @@ export class InvarianceClient {
     description?: string;
     metadata?: Record<string, unknown>;
   }): Promise<EvalDataset> {
-    const res = await this.request<{ dataset: EvalDataset }>(
-      "POST",
-      "/v1/eval-datasets",
-      { body: input },
-    );
+    const res = await this.request<{ dataset: EvalDataset }>("POST", "/v1/eval-datasets", {
+      body: input,
+    });
     return res.dataset;
   }
 
@@ -778,11 +832,9 @@ export class InvarianceClient {
     definition?: Record<string, unknown>;
     metadata?: Record<string, unknown>;
   }): Promise<EvalScorer> {
-    const res = await this.request<{ scorer: EvalScorer }>(
-      "POST",
-      "/v1/eval-scorers",
-      { body: input },
-    );
+    const res = await this.request<{ scorer: EvalScorer }>("POST", "/v1/eval-scorers", {
+      body: input,
+    });
     return res.scorer;
   }
 
@@ -824,10 +876,7 @@ export class InvarianceClient {
     return res.eval_run;
   }
 
-  async compareEvalRuns(
-    runId: string,
-    baselineRunId: string,
-  ): Promise<CompareResponse> {
+  async compareEvalRuns(runId: string, baselineRunId: string): Promise<CompareResponse> {
     const res = await this.request<{ comparison: CompareResponse }>(
       "GET",
       `/v1/eval-runs/${encodeURIComponent(runId)}/compare`,
@@ -844,10 +893,7 @@ export class InvarianceClient {
     return res.eval_run;
   }
 
-  async listEvalResults(
-    id: string,
-    opts: PageOptions = {},
-  ): Promise<Page<EvalResultRecord>> {
+  async listEvalResults(id: string, opts: PageOptions = {}): Promise<Page<EvalResultRecord>> {
     return this.request<Page<EvalResultRecord>>(
       "GET",
       `/v1/eval-runs/${encodeURIComponent(id)}/results`,
@@ -857,15 +903,19 @@ export class InvarianceClient {
 
   // ── Metrics ──
 
-  async metricsOverview(params: {
-    window_hours?: number;
-  } = {}): Promise<unknown> {
+  async metricsOverview(
+    params: {
+      window_hours?: number;
+    } = {},
+  ): Promise<unknown> {
     return this.request("GET", "/v1/metrics/overview", { params });
   }
 
-  async metricsAgents(params: {
-    window_hours?: number;
-  } = {}): Promise<unknown> {
+  async metricsAgents(
+    params: {
+      window_hours?: number;
+    } = {},
+  ): Promise<unknown> {
     return this.request("GET", "/v1/metrics/agents", { params });
   }
 
@@ -929,11 +979,9 @@ export class InvarianceClient {
     status?: GuardrailStatus;
     agent_id?: string;
   }): Promise<Guardrail> {
-    const res = await this.request<{ guardrail: unknown }>(
-      "POST",
-      "/v1/guardrails",
-      { body: input },
-    );
+    const res = await this.request<{ guardrail: unknown }>("POST", "/v1/guardrails", {
+      body: input,
+    });
     return GuardrailSchema.parse(res.guardrail);
   }
 
