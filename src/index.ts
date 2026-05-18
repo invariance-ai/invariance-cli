@@ -32,6 +32,7 @@ import { guardrailsCommand } from "./commands/guardrails/index.js";
 import { evalCommand } from "./commands/eval/index.js";
 import { evalsCommand } from "./commands/evals/index.js";
 import { recordCommand } from "./commands/record/index.js";
+import { cortexCommand } from "./commands/cortex/index.js";
 import { statusCommand } from "./commands/status.js";
 import { doctorCommand } from "./commands/doctor.js";
 import { completionsCommand } from "./commands/completions.js";
@@ -112,6 +113,7 @@ export function buildProgram(): Command {
   program.addCommand(evalCommand);
   program.addCommand(evalsCommand);
   program.addCommand(recordCommand);
+  program.addCommand(cortexCommand);
   program.addCommand(statusCommand);
 
   // Top-level ergonomics: `invariance login` / `invariance logout` mirror
