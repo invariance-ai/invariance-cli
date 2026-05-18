@@ -50,6 +50,7 @@ export const COMMANDS: Record<string, string[]> = {
   guardrails: ["list", "get", "promote"],
   eval: ["run", "list", "summarize", "dataset", "scorer", "experiment", "compare"],
   evals: ["create-case", "list", "run", "export", "run-byo", "ingest-results", "results"],
+  cortex: ["job", "counterfactual"],
   completions: ["bash", "zsh", "fish"],
 };
 

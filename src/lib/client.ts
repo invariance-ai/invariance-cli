@@ -68,6 +68,13 @@ import {
   type DnaEdge,
   type DnaEdgeExplain,
   type DnaQueryResponse,
+  CortexJobCreateResponseSchema,
+  CortexJobSchema,
+  CortexJobResultSchema,
+  type CortexJob,
+  type CortexJobCreateRequest,
+  type CortexJobCreateResponse,
+  type CortexJobResult,
 } from "../types/index.js";
 import { ApiError, AuthenticationError, NetworkError, NotFoundError } from "./errors.js";
 import {
@@ -1042,6 +1049,34 @@ export class InvarianceClient {
     return this.parsed(DnaQueryResponseSchema, "POST", "/v1/dna/query", {
       body: input,
     });
+  }
+
+  // ── Cortex jobs (generic evals, counterfactuals, attribution) ──
+
+  async createCortexJob(input: CortexJobCreateRequest): Promise<CortexJobCreateResponse> {
+    return this.parsed(CortexJobCreateResponseSchema, "POST", "/v1/cortex/jobs", {
+      body: input,
+    });
+  }
+
+  async getCortexJob(id: string): Promise<CortexJob> {
+    const res = await this.request<{ job: unknown } | unknown>(
+      "GET",
+      `/v1/cortex/jobs/${encodeURIComponent(id)}`,
+    );
+    const job =
+      res && typeof res === "object" && "job" in (res as Record<string, unknown>)
+        ? (res as { job: unknown }).job
+        : res;
+    return CortexJobSchema.parse(job);
+  }
+
+  async getCortexJobResult(id: string): Promise<CortexJobResult> {
+    return this.parsed(
+      CortexJobResultSchema,
+      "GET",
+      `/v1/cortex/jobs/${encodeURIComponent(id)}/result`,
+    );
   }
 }
 

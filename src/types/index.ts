@@ -675,6 +675,88 @@ export const DnaQueryResponseSchema = z.object({
 });
 export type DnaQueryResponse = z.infer<typeof DnaQueryResponseSchema>;
 
+// ── Cortex jobs (evals, counterfactuals, attribution, etc.) ──
+
+export const CortexJobKindSchema = z.enum([
+  "workflow_eval",
+  "counterfactual_eval",
+  "workflow_experiment",
+  "outcome_attribution",
+  "recommendation_impact_eval",
+  "prompt_variant_eval",
+  "policy_eval",
+]);
+export type CortexJobKind = z.infer<typeof CortexJobKindSchema>;
+
+export const CortexTargetTypeSchema = z.enum([
+  "run",
+  "case",
+  "workflow",
+  "step",
+  "agent",
+  "prompt",
+  "policy",
+  "recommendation",
+  "external",
+]);
+export type CortexTargetType = z.infer<typeof CortexTargetTypeSchema>;
+
+export const CortexJobStatusSchema = z.enum([
+  "queued",
+  "leased",
+  "running",
+  "succeeded",
+  "failed",
+  "dead",
+  "cancelled",
+]);
+export type CortexJobStatus = z.infer<typeof CortexJobStatusSchema>;
+
+/**
+ * Server-side accepted shape for `POST /v1/cortex/jobs`. Mirrors the plan in
+ * `give-fiel-apth-for-zesty-forest.md` (Generic Cortex Evals + Counterfactuals).
+ * Actor is resolved from the API key, so it is not sent.
+ */
+export interface CortexJobCreateRequest {
+  project_id: string;
+  job_kind: CortexJobKind;
+  target_type: CortexTargetType;
+  target_ref: string;
+  question?: string;
+  criteria?: Record<string, unknown>;
+  input_refs?: Record<string, unknown>;
+  input_payload?: Record<string, unknown>;
+  options?: Record<string, unknown>;
+}
+
+export const CortexJobCreateResponseSchema = z.object({
+  job_id: z.string(),
+  status: CortexJobStatusSchema,
+  deduplicated: z.boolean(),
+});
+export type CortexJobCreateResponse = z.infer<typeof CortexJobCreateResponseSchema>;
+
+export const CortexJobSchema = z.object({
+  id: z.string(),
+  project_id: z.string(),
+  job_kind: CortexJobKindSchema,
+  target_type: CortexTargetTypeSchema,
+  target_ref: z.string(),
+  question: z.string().nullable().optional(),
+  status: CortexJobStatusSchema,
+  created_at: z.string(),
+  updated_at: z.string(),
+});
+export type CortexJob = z.infer<typeof CortexJobSchema>;
+
+export const CortexJobResultSchema = z.object({
+  job_id: z.string(),
+  status: CortexJobStatusSchema,
+  result: z.record(z.string(), z.unknown()).nullable().optional(),
+  error: z.string().nullable().optional(),
+});
+export type CortexJobResult = z.infer<typeof CortexJobResultSchema>;
+
 // ── CLI global options ──
 
 export interface GlobalOptions {
