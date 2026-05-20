@@ -15,6 +15,7 @@ import { runCommand } from "./commands/run/index.js";
 import { caseCommand } from "./commands/case/index.js";
 import { workflowCommand } from "./commands/workflow/index.js";
 import { eventCommand } from "./commands/event/index.js";
+import { captureCommand } from "./commands/capture/index.js";
 import { nodeCommand } from "./commands/node/index.js";
 import { monitorCommand } from "./commands/monitor/index.js";
 import { signalCommand } from "./commands/signal/index.js";
@@ -91,10 +92,12 @@ export function buildProgram(): Command {
   ensureAlias(signalCommand, "signals");
   ensureAlias(findingCommand, "findings");
   ensureAlias(reviewCommand, "reviews");
+  ensureAlias(captureCommand, "captures");
 
   program.addCommand(caseCommand);
   program.addCommand(workflowCommand);
   program.addCommand(eventCommand);
+  program.addCommand(captureCommand);
   program.addCommand(runCommand);
   program.addCommand(nodeCommand);
   program.addCommand(monitorCommand);

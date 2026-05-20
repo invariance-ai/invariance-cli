@@ -38,6 +38,7 @@ describe("command wiring", () => {
       "agent",
       "metrics",
       "eval",
+      "capture",
       "completions",
       "doctor",
       "version",
@@ -297,6 +298,101 @@ describe("command wiring", () => {
     expect(parsed.data.every((f) => f.status === "open")).toBe(true);
     expect(parsed.data.map((f) => f.id).sort()).toEqual(["f_open_1", "f_open_2"]);
     logSpy.mockRestore();
+  });
+
+  it("capture create posts to /v1/captures", async () => {
+    process.env.INVARIANCE_API_KEY = "inv_test_key";
+    process.env.INVARIANCE_BASE_URL = "https://api.test";
+    const session = {
+      id: "cap_1",
+      agent_id: null,
+      operator_id: null,
+      run_id: null,
+      source: "manual_note",
+      session_type: null,
+      external_session_id: null,
+      title: "Test capture",
+      status: null,
+      metadata: {},
+      created_at: "2026-01-01T00:00:00.000Z",
+      updated_at: "2026-01-01T00:00:00.000Z",
+    };
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(JSON.stringify({ session }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    const writes: string[] = [];
+    const writeSpy = vi
+      .spyOn(process.stdout, "write")
+      .mockImplementation((chunk: unknown) => {
+        writes.push(String(chunk));
+        return true;
+      });
+    const program = buildProgram();
+    program.exitOverride();
+
+    await program.parseAsync(
+      ["--json", "capture", "create", "--source", "manual_note", "--title", "Test capture"],
+      { from: "user" },
+    );
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(String(fetchSpy.mock.calls[0]?.[0])).toBe("https://api.test/v1/captures");
+    expect(fetchSpy.mock.calls[0]?.[1]).toMatchObject({ method: "POST" });
+    expect(JSON.parse(String(fetchSpy.mock.calls[0]?.[1]?.body))).toMatchObject({
+      source: "manual_note",
+      title: "Test capture",
+    });
+    expect(JSON.parse(writes.join("").trimEnd())).toMatchObject({ id: "cap_1" });
+    writeSpy.mockRestore();
+  });
+
+  it("capture link <id> --run-id r_1 patches /v1/captures/<id> with {run_id}", async () => {
+    process.env.INVARIANCE_API_KEY = "inv_test_key";
+    process.env.INVARIANCE_BASE_URL = "https://api.test";
+    const session = {
+      id: "cap_2",
+      agent_id: null,
+      operator_id: null,
+      run_id: "r_1",
+      source: "api",
+      session_type: null,
+      external_session_id: null,
+      title: null,
+      status: null,
+      metadata: {},
+      created_at: "2026-01-01T00:00:00.000Z",
+      updated_at: "2026-01-01T00:00:00.000Z",
+    };
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(JSON.stringify({ session }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    const writes: string[] = [];
+    const writeSpy = vi
+      .spyOn(process.stdout, "write")
+      .mockImplementation((chunk: unknown) => {
+        writes.push(String(chunk));
+        return true;
+      });
+    const program = buildProgram();
+    program.exitOverride();
+
+    await program.parseAsync(
+      ["--json", "capture", "link", "cap_2", "--run-id", "r_1"],
+      { from: "user" },
+    );
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(String(fetchSpy.mock.calls[0]?.[0])).toBe("https://api.test/v1/captures/cap_2");
+    expect(fetchSpy.mock.calls[0]?.[1]).toMatchObject({ method: "PATCH" });
+    expect(JSON.parse(String(fetchSpy.mock.calls[0]?.[1]?.body))).toEqual({ run_id: "r_1" });
+    expect(JSON.parse(writes.join("").trimEnd())).toMatchObject({ id: "cap_2", run_id: "r_1" });
+    writeSpy.mockRestore();
   });
 
   it("run inspect returns composite shape {run, metrics, narrative, recent_nodes, open_findings}", async () => {
