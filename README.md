@@ -37,23 +37,23 @@ inv status --json
 # Create a case for one workflow instance, then attach a run as evidence
 CASE=$(inv case create --workflow-key support.escalation --tenant-id acme --end-user-id cus_123 --json | jq -r .id)
 RUN=$(inv run start --name triage --case-id "$CASE" --json | jq -r .id)
-inv nodes write "$RUN" --action-type tool_call --input '{"x":1}' --output '{"y":2}'
+inv node write "$RUN" --action-type tool_call --input '{"x":1}' --output '{"y":2}'
 inv run finish "$RUN"
-inv runs verify "$RUN"
+inv run verify "$RUN"
 inv case close "$CASE" --outcome resolved --value-usd 250 --json
 
 # Inspect a finished run end-to-end (run + nodes in one JSON blob)
-inv runs inspect "$RUN" --json
+inv run inspect "$RUN" --json
 
 # Stream nodes, or fetch one page for scripts/smoke tests
-inv nodes tail "$RUN"
-inv nodes tail "$RUN" --once --json
+inv node tail "$RUN"
+inv node tail "$RUN" --once --json
 
 # Export a full run (run + nodes) for offline analysis
-inv runs export "$RUN" > run.json
+inv run export "$RUN" > run.json
 
 # Open in dashboard (or just print the URL with --print)
-inv runs open "$RUN" --print
+inv run open "$RUN" --print
 
 # Monitors, signals, reviews
 inv monitor list
@@ -102,11 +102,11 @@ All data commands support `--json` for machine-readable output.
 `inv` is built so coding agents can debug their own agents deterministically. Two commands cover the loop:
 
 ```bash
-inv runs inspect <run_id> --json   # full run + nodes in one structured blob
-inv nodes tail <run_id> --json     # streaming trace events as JSON lines
+inv run inspect <run_id> --json   # full run + nodes in one structured blob
+inv node tail <run_id> --json     # streaming trace events as JSON lines
 ```
 
-Every command emits stable IDs and structured errors, so chained calls (`jq`, scripts, agents) don't have to scrape human output. When something fails, an agent can fetch the failing run with `inv runs inspect`, locate the failing node, and report or replay it.
+Every command emits stable IDs and structured errors, so chained calls (`jq`, scripts, agents) don't have to scrape human output. When something fails, an agent can fetch the failing run with `inv run inspect`, locate the failing node, and report or replay it.
 
 See [`AGENTS.md`](AGENTS.md) for the agent-friendly command reference.
 

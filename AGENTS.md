@@ -12,8 +12,8 @@ The human user should run these once. Agents should prompt the user to do this r
 
 ```bash
 npm install -g @invariance/cli
-invariance login --browser   # opens dashboard, approves this device
-invariance doctor            # verifies setup
+inv login --browser   # opens dashboard, approves this device
+inv doctor            # verifies setup
 ```
 
 Credentials are stored at `~/.invariance/config.json`.
@@ -26,20 +26,20 @@ Wrap any multi-step task with a run. Use `--json` so you can parse IDs.
 
 ```bash
 # 1. Start a run for the task
-RUN_ID=$(invariance run start --name "refactor auth middleware" --json | jq -r .id)
+RUN_ID=$(inv run start --name "refactor auth middleware" --json | jq -r .id)
 
 # 2. For each tool/LLM call, write a node
-invariance node write "$RUN_ID" \
+inv node write "$RUN_ID" \
   --action-type tool_call \
   --metadata '{"tool":"grep","step":"auth search"}' \
   --input  '{"pattern":"verifyToken"}' \
   --output '{"matches":7}'
 
 # 3. End the run when done
-invariance run update "$RUN_ID" --status completed
+inv run finish "$RUN_ID"
 
 # 4. (Optional) verify the proof chain wasn't tampered with
-invariance run verify "$RUN_ID"
+inv run verify "$RUN_ID"
 ```
 
 ## Conventions
@@ -53,16 +53,16 @@ invariance run verify "$RUN_ID"
 ## Discovering what's available
 
 ```bash
-invariance --help             # top-level commands
-invariance run --help         # subcommands for runs
-invariance node write --help  # flags for a specific command
+inv --help             # top-level commands
+inv run --help         # subcommands for runs
+inv node write --help  # flags for a specific command
 ```
 
 Every command accepts `--help`; prefer that over guessing flags.
 
 ## Failure modes
 
-- `401 Unauthorized` → credentials missing/expired. Ask the user to rerun `invariance login --browser`.
+- `401 Unauthorized` → credentials missing/expired. Ask the user to rerun `inv login --browser`.
 - `404 Not Found` on a run ID → run was deleted or belongs to another org. Don't retry; start a new run.
 - Network errors → the CLI is non-blocking for your task. Log and continue; don't hang waiting on Invariance.
 
