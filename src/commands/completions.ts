@@ -51,6 +51,7 @@ export const COMMANDS: Record<string, string[]> = {
   eval: ["run", "list", "summarize", "dataset", "scorer", "experiment", "compare"],
   evals: ["create-case", "list", "run", "export", "run-byo", "ingest-results", "results"],
   cortex: ["job", "counterfactual"],
+  capture: ["create", "get", "link", "links", "list", "unlink", "update"],
   completions: ["bash", "zsh", "fish"],
 };
 

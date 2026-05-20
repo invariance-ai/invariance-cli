@@ -1001,6 +1001,69 @@ export class InvarianceClient {
     return GuardrailSchema.parse(res.guardrail);
   }
 
+  // ── Captures ──
+
+  async createCapture(input: {
+    source: string;
+    session_type?: string;
+    title?: string;
+    occurred_at?: string;
+    run_id?: string;
+    metadata?: Record<string, unknown>;
+  }): Promise<AgentSession> {
+    const res = await this.request<{ session: unknown }>("POST", "/v1/captures", { body: input });
+    return AgentSessionSchema.parse(
+      (res as { session?: unknown }).session ?? res,
+    );
+  }
+
+  async listCaptures(
+    opts: PageOptions & {
+      project_id?: string;
+      operator_id?: string;
+      session_type?: string;
+      source?: string;
+      run_id?: string;
+    } = {},
+  ): Promise<Page<AgentSession>> {
+    const res = await this.request<{ data: unknown[]; next_cursor?: string | null }>(
+      "GET",
+      "/v1/captures",
+      {
+        params: {
+          cursor: opts.cursor,
+          limit: opts.limit,
+          project_id: opts.project_id,
+          operator_id: opts.operator_id,
+          session_type: opts.session_type,
+          source: opts.source,
+          run_id: opts.run_id,
+        },
+      },
+    );
+    return {
+      data: res.data.map((s) => AgentSessionSchema.parse(s)),
+      next_cursor: res.next_cursor ?? null,
+    };
+  }
+
+  async getCapture(id: string): Promise<AgentSession> {
+    const res = await this.request<{ session: unknown }>(
+      "GET",
+      `/v1/captures/${encodeURIComponent(id)}`,
+    );
+    return AgentSessionSchema.parse(res.session);
+  }
+
+  async updateCapture(id: string, patch: Record<string, unknown>): Promise<AgentSession> {
+    const res = await this.request<{ session: unknown }>(
+      "PATCH",
+      `/v1/captures/${encodeURIComponent(id)}`,
+      { body: patch },
+    );
+    return AgentSessionSchema.parse(res.session);
+  }
+
   // ── DNA ──
 
   async listDnaEntities(
