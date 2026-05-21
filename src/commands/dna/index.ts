@@ -17,6 +17,15 @@ const EDGE_COLUMNS = [
   { key: "label", label: "Label", width: 28 },
 ];
 
+const CANDIDATE_COLUMNS = [
+  { key: "id", label: "ID", width: 28 },
+  { key: "status", label: "Status", width: 10 },
+  { key: "relation_kind", label: "Relation", width: 14 },
+  { key: "source_object_id", label: "From", width: 22 },
+  { key: "target_object_id", label: "To", width: 22 },
+  { key: "confidence", label: "Conf", width: 6 },
+];
+
 export const dnaCommand = new Command("dna").description(
   "Company DNA: query operational objects, links, evidence, and context.",
 );
@@ -99,6 +108,69 @@ dnaCommand.addCommand(
           limit: opts.limit,
           include_edges: opts.edges,
         }),
+        globals,
+      );
+    },
+  ) as Command,
+);
+
+dnaCommand.addCommand(
+  action(
+    new Command("candidates")
+      .description(
+        "List DNA edge candidates (discovered relationships awaiting review). Output (--json): {data: DnaEdgeCandidate[], next_cursor}.",
+      )
+      .option("--status <status>", "Filter by status: proposed, accepted, rejected, expired, promoted")
+      .option("--object-id <id>", "Filter to candidates touching this object")
+      .option("--relation-kind <kind>", "Filter by relation kind")
+      .option("--limit <n>", "Page size", parseIntFlag)
+      .option("--cursor <c>", "opaque pagination token from previous response's next_cursor"),
+    async ({ client, globals, opts }) => {
+      const page = await client.listDnaEdgeCandidates({
+        status: opts.status,
+        object_id: opts.objectId,
+        relation_kind: opts.relationKind,
+        limit: opts.limit,
+        cursor: opts.cursor,
+      });
+      printPage(page, CANDIDATE_COLUMNS, globals);
+    },
+  ) as Command,
+);
+
+dnaCommand.addCommand(
+  action(
+    new Command("accept-candidate")
+      .description("Accept a proposed edge candidate, making it eligible for promotion.")
+      .argument("<candidate-id>", "DNA edge candidate id"),
+    async ({ client, globals, cmd }) => {
+      printValue(await client.acceptDnaEdgeCandidate(cmd.args[0]!), globals);
+    },
+  ) as Command,
+);
+
+dnaCommand.addCommand(
+  action(
+    new Command("reject-candidate")
+      .description("Reject an edge candidate so it is never promoted.")
+      .argument("<candidate-id>", "DNA edge candidate id"),
+    async ({ client, globals, cmd }) => {
+      printValue(await client.rejectDnaEdgeCandidate(cmd.args[0]!), globals);
+    },
+  ) as Command,
+);
+
+dnaCommand.addCommand(
+  action(
+    new Command("promote-candidate")
+      .description(
+        "Promote an accepted candidate into a durable semantic link. Requires a semantic_similarity signal and >=2 evidence chunks. Idempotent. Output (--json): {semantic_link, candidate, already_promoted, dry_run}.",
+      )
+      .argument("<candidate-id>", "DNA edge candidate id")
+      .option("--dry-run", "Preview the would-be link without writing anything"),
+    async ({ client, globals, opts, cmd }) => {
+      printValue(
+        await client.promoteDnaEdgeCandidate(cmd.args[0]!, { dryRun: !!opts.dryRun }),
         globals,
       );
     },

@@ -60,6 +60,11 @@ import {
   DnaEdgeListSchema,
   DnaEdgeExplainSchema,
   DnaQueryResponseSchema,
+  DnaEdgeCandidateListSchema,
+  DnaEdgeCandidateSchema,
+  DnaPromoteResponseSchema,
+  type DnaEdgeCandidate,
+  type DnaPromoteResponse,
   type Recipe,
   type Guardrail,
   type GuardrailMode,
@@ -1112,6 +1117,56 @@ export class InvarianceClient {
     return this.parsed(DnaQueryResponseSchema, "POST", "/v1/dna/query", {
       body: input,
     });
+  }
+
+  async listDnaEdgeCandidates(
+    opts: PageOptions & {
+      project_id?: string;
+      object_id?: string;
+      relation_kind?: string;
+      status?: DnaEdgeCandidate["status"];
+    } = {},
+  ): Promise<Page<DnaEdgeCandidate>> {
+    return this.parsed(DnaEdgeCandidateListSchema, "GET", "/v1/dna/edge-candidates", {
+      params: {
+        cursor: opts.cursor,
+        limit: opts.limit,
+        project_id: opts.project_id,
+        object_id: opts.object_id,
+        relation_kind: opts.relation_kind,
+        status: opts.status,
+      },
+    });
+  }
+
+  async acceptDnaEdgeCandidate(id: string): Promise<DnaEdgeCandidate> {
+    const res = await this.request<{ candidate: unknown }>(
+      "POST",
+      `/v1/dna/edge-candidates/${encodeURIComponent(id)}/accept`,
+      { body: {} },
+    );
+    return DnaEdgeCandidateSchema.parse(res.candidate);
+  }
+
+  async rejectDnaEdgeCandidate(id: string): Promise<DnaEdgeCandidate> {
+    const res = await this.request<{ candidate: unknown }>(
+      "POST",
+      `/v1/dna/edge-candidates/${encodeURIComponent(id)}/reject`,
+      { body: {} },
+    );
+    return DnaEdgeCandidateSchema.parse(res.candidate);
+  }
+
+  async promoteDnaEdgeCandidate(
+    id: string,
+    opts: { dryRun?: boolean } = {},
+  ): Promise<DnaPromoteResponse> {
+    return this.parsed(
+      DnaPromoteResponseSchema,
+      "POST",
+      `/v1/dna/edge-candidates/${encodeURIComponent(id)}/promote`,
+      { body: { dry_run: opts.dryRun === true } },
+    );
   }
 
   // ── Cortex jobs (generic evals, counterfactuals, attribution) ──

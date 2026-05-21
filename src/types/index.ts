@@ -151,6 +151,7 @@ export const WorkflowEventSchema = z.object({
   payload: z.record(z.string(), z.unknown()),
   evidence_node_ids: z.array(z.string()),
   evidence_refs: z.array(WorkflowEvidenceRefSchema),
+  idempotency_key: z.string().nullable().optional(),
   occurred_at: z.string(),
   created_at: z.string(),
 });
@@ -661,6 +662,51 @@ export const DnaEdgeExplainSchema = z.object({
   target_entity: DnaEntitySchema.nullable(),
 });
 export type DnaEdgeExplain = z.infer<typeof DnaEdgeExplainSchema>;
+
+export const DnaEdgeCandidateSchema = z.object({
+  id: z.string(),
+  project_id: z.string(),
+  source_object_id: z.string(),
+  target_object_id: z.string(),
+  relation_kind: z.string(),
+  confidence: z.number(),
+  evidence_event_ids: z.array(z.string()),
+  evidence_chunk_ids: z.array(z.string()),
+  reason_codes: z.array(z.string()),
+  rationale: z.string(),
+  status: z.enum(["proposed", "accepted", "rejected", "expired", "promoted"]),
+  created_at: z.string(),
+  updated_at: z.string(),
+  expires_at: z.string().nullable(),
+});
+export type DnaEdgeCandidate = z.infer<typeof DnaEdgeCandidateSchema>;
+export const DnaEdgeCandidateListSchema = ListSchema(DnaEdgeCandidateSchema);
+
+export const DnaSemanticLinkSchema = z.object({
+  id: z.string(),
+  project_id: z.string(),
+  source_chunk_id: z.string(),
+  target_chunk_id: z.string(),
+  source_object_id: z.string().nullable(),
+  target_object_id: z.string().nullable(),
+  relation_kind: z.string(),
+  confidence: z.number(),
+  rationale: z.string(),
+  evidence_chunk_ids: z.array(z.string()),
+  model_version: z.string().nullable(),
+  status: z.string(),
+  created_at: z.string(),
+  last_reinforced_at: z.string().nullable(),
+});
+export type DnaSemanticLink = z.infer<typeof DnaSemanticLinkSchema>;
+
+export const DnaPromoteResponseSchema = z.object({
+  semantic_link: DnaSemanticLinkSchema,
+  candidate: DnaEdgeCandidateSchema,
+  already_promoted: z.boolean(),
+  dry_run: z.boolean(),
+});
+export type DnaPromoteResponse = z.infer<typeof DnaPromoteResponseSchema>;
 
 export const DnaQueryResponseSchema = z.object({
   query: z.object({
