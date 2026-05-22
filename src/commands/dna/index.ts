@@ -26,6 +26,24 @@ const CANDIDATE_COLUMNS = [
   { key: "confidence", label: "Conf", width: 6 },
 ];
 
+const OBJECT_COLUMNS = [
+  { key: "id", label: "ID", width: 28 },
+  { key: "kind", label: "Kind", width: 16 },
+  { key: "title", label: "Title", width: 30 },
+  { key: "external_id", label: "External", width: 16 },
+  { key: "status", label: "Status", width: 10 },
+  { key: "created_at", label: "Created", width: 24 },
+];
+
+const MENTION_COLUMNS = [
+  { key: "id", label: "ID", width: 28 },
+  { key: "mention_type", label: "Type", width: 14 },
+  { key: "normalized_value", label: "Value", width: 24 },
+  { key: "object_id", label: "Object", width: 22 },
+  { key: "event_id", label: "Event", width: 22 },
+  { key: "confidence", label: "Conf", width: 6 },
+];
+
 export const dnaCommand = new Command("dna").description(
   "Company DNA: query operational objects, links, evidence, and context.",
 );
@@ -48,6 +66,58 @@ dnaCommand.addCommand(
         cursor: opts.cursor,
       });
       printPage(page, ENTITY_COLUMNS, globals);
+    },
+  ) as Command,
+);
+
+dnaCommand.addCommand(
+  action(
+    new Command("objects")
+      .description(
+        "List DNA objects (project-scoped operational entities; distinct from agent-scoped `entities`). Output (--json): {data: DnaObject[], next_cursor}.",
+      )
+      .option("--project-id <id>", "Scope to one project")
+      .option("--kind <kind>", "Filter by object kind, e.g. service, support_ticket, policy")
+      .option("--q <text>", "Search title, external id, kind, or source")
+      .option("--limit <n>", "Page size", parseIntFlag)
+      .option("--cursor <c>", "opaque pagination token from previous response's next_cursor"),
+    async ({ client, globals, opts }) => {
+      const page = await client.listDnaObjects({
+        project_id: opts.projectId,
+        kind: opts.kind,
+        q: opts.q,
+        limit: opts.limit,
+        cursor: opts.cursor,
+      });
+      printPage(page, OBJECT_COLUMNS, globals);
+    },
+  ) as Command,
+);
+
+dnaCommand.addCommand(
+  action(
+    new Command("object-mentions")
+      .description(
+        "List DNA object mentions (extracted references that may resolve to an object). Output (--json): {data: DnaObjectMention[], next_cursor}.",
+      )
+      .option("--project-id <id>", "Scope to one project")
+      .option("--event-id <id>", "Filter to mentions from this DNA event")
+      .option("--chunk-id <id>", "Filter to mentions from this context chunk")
+      .option("--object-id <id>", "Filter to mentions resolved to this object")
+      .option("--mention-type <type>", "Filter by mention type")
+      .option("--limit <n>", "Page size", parseIntFlag)
+      .option("--cursor <c>", "opaque pagination token from previous response's next_cursor"),
+    async ({ client, globals, opts }) => {
+      const page = await client.listDnaObjectMentions({
+        project_id: opts.projectId,
+        event_id: opts.eventId,
+        chunk_id: opts.chunkId,
+        object_id: opts.objectId,
+        mention_type: opts.mentionType,
+        limit: opts.limit,
+        cursor: opts.cursor,
+      });
+      printPage(page, MENTION_COLUMNS, globals);
     },
   ) as Command,
 );

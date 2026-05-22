@@ -708,6 +708,42 @@ export const DnaPromoteResponseSchema = z.object({
 });
 export type DnaPromoteResponse = z.infer<typeof DnaPromoteResponseSchema>;
 
+// Project-scoped DNA-stack object (distinct from the agent-scoped DnaEntity).
+export const DnaObjectSchema = z.object({
+  id: z.string(),
+  project_id: z.string(),
+  kind: z.string(),
+  source: z.string(),
+  external_id: z.string().nullable(),
+  title: z.string(),
+  properties: z.record(z.string(), z.unknown()),
+  aliases: z.array(z.string()),
+  confidence: z.number(),
+  status: z.enum(["active", "merged", "archived", "rejected"]),
+  created_at: z.string(),
+  updated_at: z.string(),
+});
+export type DnaObject = z.infer<typeof DnaObjectSchema>;
+export const DnaObjectListSchema = ListSchema(DnaObjectSchema);
+
+export const DnaObjectMentionSchema = z.object({
+  id: z.string(),
+  project_id: z.string(),
+  event_id: z.string().nullable(),
+  chunk_id: z.string().nullable(),
+  object_id: z.string().nullable(),
+  candidate_object_key: z.string(),
+  mention_type: z.string(),
+  extracted_text: z.string(),
+  normalized_value: z.string(),
+  confidence: z.number(),
+  extractor: z.string(),
+  evidence: z.record(z.string(), z.unknown()),
+  created_at: z.string(),
+});
+export type DnaObjectMention = z.infer<typeof DnaObjectMentionSchema>;
+export const DnaObjectMentionListSchema = ListSchema(DnaObjectMentionSchema);
+
 export const DnaQueryResponseSchema = z.object({
   query: z.object({
     q: z.string(),

@@ -63,6 +63,10 @@ import {
   DnaEdgeCandidateListSchema,
   DnaEdgeCandidateSchema,
   DnaPromoteResponseSchema,
+  DnaObjectListSchema,
+  DnaObjectMentionListSchema,
+  type DnaObject,
+  type DnaObjectMention,
   type DnaEdgeCandidate,
   type DnaPromoteResponse,
   type Recipe,
@@ -1081,6 +1085,42 @@ export class InvarianceClient {
         run_id: opts.run_id,
         kind: opts.kind,
         q: opts.q,
+      },
+    });
+  }
+
+  async listDnaObjects(
+    opts: PageOptions & { project_id?: string; kind?: string; q?: string } = {},
+  ): Promise<Page<DnaObject>> {
+    return this.parsed(DnaObjectListSchema, "GET", "/v1/dna/objects", {
+      params: {
+        cursor: opts.cursor,
+        limit: opts.limit,
+        project_id: opts.project_id,
+        kind: opts.kind,
+        q: opts.q,
+      },
+    });
+  }
+
+  async listDnaObjectMentions(
+    opts: PageOptions & {
+      project_id?: string;
+      event_id?: string;
+      chunk_id?: string;
+      object_id?: string;
+      mention_type?: string;
+    } = {},
+  ): Promise<Page<DnaObjectMention>> {
+    return this.parsed(DnaObjectMentionListSchema, "GET", "/v1/dna/object-mentions", {
+      params: {
+        cursor: opts.cursor,
+        limit: opts.limit,
+        project_id: opts.project_id,
+        event_id: opts.event_id,
+        chunk_id: opts.chunk_id,
+        object_id: opts.object_id,
+        mention_type: opts.mention_type,
       },
     });
   }
