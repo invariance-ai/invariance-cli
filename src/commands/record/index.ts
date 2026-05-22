@@ -10,7 +10,10 @@ import {
   type AgentEventInput,
   type Source,
 } from "../../lib/record.js";
+import { getDeviceInfo } from "../../lib/device.js";
 import { runMcpProxy } from "./mcp-proxy.js";
+
+type NormalizedEvent = Omit<AgentEventInput, "seq">;
 
 export const recordCommand = new Command("record")
   .description("Capture Claude Code / Codex / SDK sessions into Invariance");
@@ -189,94 +192,218 @@ async function handleClaudeHook(eventName: string, payload: Record<string, unkno
   });
   if (!session) return;
 
-  const event = normalizeClaudeEvent(eventName, payload);
-  if (!event) return;
-  // Carry the original payload as `raw` for debugging / future reprocessing.
-  event.raw = payload;
-  if (transcriptPath && !event.payload) event.payload = { transcript_path: transcriptPath };
-
-  await recordEvent(session.id, event);
+  const events = normalizeClaudeEvent(eventName, payload);
+  for (let i = 0; i < events.length; i++) {
+    const event = events[i]!;
+    // Carry the original payload as `raw` on the primary event only (i=0),
+    // to keep derived events (e.g. file_changed) compact.
+    if (i === 0) event.raw = payload;
+    if (transcriptPath && !event.payload) event.payload = { transcript_path: transcriptPath };
+    await recordEvent(session.id, event);
+  }
 }
 
-function normalizeClaudeEvent(
+export function normalizeClaudeEvent(
   eventName: string,
   payload: Record<string, unknown>,
-): Omit<AgentEventInput, "seq"> | null {
+): NormalizedEvent[] {
   switch (eventName) {
-    case "SessionStart":
-      return {
-        event_type: "session_start",
-        payload: {
-          source: payload.source,
-          model: extractModel(payload),
-          cwd: payload.cwd,
+    case "SessionStart": {
+      const device = getDeviceInfo();
+      return [
+        {
+          event_type: "session_start",
+          payload: {
+            source: payload.source,
+            model: extractModel(payload),
+            cwd: payload.cwd,
+            device_id: device.device_id,
+            hostname: device.hostname,
+            platform: device.platform,
+            os_release: device.os_release,
+            arch: device.arch,
+          },
         },
-      };
+      ];
+    }
     case "SessionEnd":
-      return {
-        event_type: "session_end",
-        payload: { reason: payload.reason ?? "unknown" },
-      };
+      return [
+        {
+          event_type: "session_end",
+          payload: { reason: payload.reason ?? "unknown" },
+        },
+      ];
     case "UserPromptSubmit":
-      return {
-        event_type: "user_prompt",
-        payload: { prompt: payload.prompt ?? "" },
-      };
+      return [
+        {
+          event_type: "user_prompt",
+          payload: { prompt: payload.prompt ?? "" },
+        },
+      ];
     case "Stop":
-      return {
-        event_type: "assistant_message",
-        payload: {
-          stop_reason: payload.stop_reason,
-          content: payload.response ?? payload.content ?? "",
+      return [
+        {
+          event_type: "assistant_message",
+          payload: {
+            stop_reason: payload.stop_reason,
+            content: payload.response ?? payload.content ?? "",
+          },
         },
-      };
+      ];
     case "PreToolUse":
-      return {
-        event_type: "tool_call_start",
-        tool_use_id: stringOrUndef(payload.tool_use_id),
-        payload: {
-          tool_name: payload.tool_name,
-          input: payload.tool_input,
+      return [
+        {
+          event_type: "tool_call_start",
+          tool_use_id: stringOrUndef(payload.tool_use_id),
+          payload: {
+            tool_name: payload.tool_name,
+            input: payload.tool_input,
+          },
         },
-      };
-    case "PostToolUse":
-      return {
-        event_type: "tool_call_end",
-        tool_use_id: stringOrUndef(payload.tool_use_id),
-        payload: {
-          tool_name: payload.tool_name,
-          input: payload.tool_input,
-          output: payload.tool_output,
-          error: payload.tool_error,
+      ];
+    case "PostToolUse": {
+      const events: NormalizedEvent[] = [
+        {
+          event_type: "tool_call_end",
+          tool_use_id: stringOrUndef(payload.tool_use_id),
+          payload: {
+            tool_name: payload.tool_name,
+            input: payload.tool_input,
+            output: payload.tool_output ?? payload.tool_response,
+            error: payload.tool_error,
+          },
         },
-      };
+      ];
+      for (const fc of extractFileChanges(payload)) {
+        events.push({
+          event_type: "file_changed",
+          tool_use_id: stringOrUndef(payload.tool_use_id),
+          payload: fc,
+        });
+      }
+      return events;
+    }
     case "PermissionRequest":
-      return {
-        event_type: "permission_request",
-        payload: {
-          tool_name: payload.tool_name,
-          rule: payload.permission_rule ?? payload.rule,
+      return [
+        {
+          event_type: "permission_request",
+          payload: {
+            tool_name: payload.tool_name,
+            rule: payload.permission_rule ?? payload.rule,
+          },
         },
-      };
+      ];
     case "FileChanged":
-      return {
-        event_type: "file_changed",
-        payload: { path: payload.path ?? payload.file_path },
-      };
+      return [
+        {
+          event_type: "file_changed",
+          payload: { path: payload.path ?? payload.file_path },
+        },
+      ];
     case "Notification":
-      return {
-        event_type: "notification",
-        payload: { notification_type: payload.notification_type, message: payload.message },
-      };
+      return [
+        {
+          event_type: "notification",
+          payload: { notification_type: payload.notification_type, message: payload.message },
+        },
+      ];
     case "PreCompact":
     case "PostCompact":
-      return { event_type: "compaction", payload: { phase: eventName } };
+      return [{ event_type: "compaction", payload: { phase: eventName } }];
     default:
-      return {
-        event_type: "custom",
-        payload: { event_name: eventName, ...payload },
-      };
+      return [
+        {
+          event_type: "custom",
+          payload: { event_name: eventName, ...payload },
+        },
+      ];
   }
+}
+
+const FILE_TOOLS = new Set(["Edit", "Write", "MultiEdit", "NotebookEdit"]);
+const DIFF_PREVIEW_MAX = 500;
+
+interface FileChangePayload {
+  path: string;
+  tool: string;
+  change_type: "create" | "edit" | "replace";
+  bytes_before: number;
+  bytes_after: number;
+  lines_added: number;
+  lines_removed: number;
+  diff_preview: string;
+  [k: string]: unknown;
+}
+
+function extractFileChanges(payload: Record<string, unknown>): FileChangePayload[] {
+  const toolName = typeof payload.tool_name === "string" ? payload.tool_name : null;
+  if (!toolName || !FILE_TOOLS.has(toolName)) return [];
+  const input = (payload.tool_input ?? {}) as Record<string, unknown>;
+  const filePath = stringOrUndef(input.file_path) ?? stringOrUndef(input.notebook_path);
+  if (!filePath) return [];
+
+  switch (toolName) {
+    case "Write": {
+      const content = typeof input.content === "string" ? input.content : "";
+      return [summarize(filePath, "Write", "create", "", content)];
+    }
+    case "Edit": {
+      const oldStr = typeof input.old_string === "string" ? input.old_string : "";
+      const newStr = typeof input.new_string === "string" ? input.new_string : "";
+      return [summarize(filePath, "Edit", "edit", oldStr, newStr)];
+    }
+    case "MultiEdit": {
+      const edits = Array.isArray(input.edits) ? input.edits : [];
+      let oldAll = "";
+      let newAll = "";
+      for (const e of edits) {
+        const o = (e as Record<string, unknown>).old_string;
+        const n = (e as Record<string, unknown>).new_string;
+        if (typeof o === "string") oldAll += o + "\n";
+        if (typeof n === "string") newAll += n + "\n";
+      }
+      return [summarize(filePath, "MultiEdit", "edit", oldAll, newAll)];
+    }
+    case "NotebookEdit": {
+      const newSrc = typeof input.new_source === "string" ? input.new_source : "";
+      return [summarize(filePath, "NotebookEdit", "edit", "", newSrc)];
+    }
+    default:
+      return [];
+  }
+}
+
+function summarize(
+  filePath: string,
+  tool: string,
+  changeType: "create" | "edit" | "replace",
+  before: string,
+  after: string,
+): FileChangePayload {
+  const beforeLines = before ? before.split("\n") : [];
+  const afterLines = after ? after.split("\n") : [];
+  return {
+    path: filePath,
+    tool,
+    change_type: changeType,
+    bytes_before: Buffer.byteLength(before, "utf8"),
+    bytes_after: Buffer.byteLength(after, "utf8"),
+    lines_added: afterLines.length,
+    lines_removed: beforeLines.length,
+    diff_preview: makeDiffPreview(before, after),
+  };
+}
+
+function makeDiffPreview(before: string, after: string): string {
+  const parts: string[] = [];
+  if (before) {
+    for (const line of before.split("\n")) parts.push("- " + line);
+  }
+  if (after) {
+    for (const line of after.split("\n")) parts.push("+ " + line);
+  }
+  const out = parts.join("\n");
+  return out.length > DIFF_PREVIEW_MAX ? out.slice(0, DIFF_PREVIEW_MAX) + "…" : out;
 }
 
 async function handleCodexNotify(payload: Record<string, unknown>): Promise<void> {
