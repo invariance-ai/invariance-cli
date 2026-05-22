@@ -137,3 +137,63 @@ captureCommand.addCommand(
     },
   ) as Command,
 );
+
+// ── Evidence-graph links (POST/GET/DELETE /v1/captures/:id/links) ──
+// Attach a capture to an execution/event/run/node with a typed relationship.
+// Richer than `link` (which sets the single legacy run_id FK).
+
+captureCommand.addCommand(
+  action(
+    new Command("link-add")
+      .description(
+        "Attach a capture to the evidence graph (execution/event/run/node). Output (--json): the created CaptureLink.",
+      )
+      .argument("<id>", "Capture ID")
+      .option("--case-id <id>", "Execution (case) to link to")
+      .option("--event-id <id>", "Workflow event to link to")
+      .option("--run-id <id>", "Run to link to")
+      .option("--node-id <id>", "Node to link to")
+      .option("--link-type <t>", "evidence | source | derived_from | mentions | related")
+      .option("--metadata <json>", "Additional metadata JSON object")
+      .addHelpText(
+        "after",
+        "\nExample:\n  $ inv capture link-add cap_123 --case-id case_456 --link-type evidence\n",
+      ),
+    async ({ client, globals, opts, cmd }) => {
+      const body: Parameters<typeof client.createCaptureLink>[1] = {};
+      if (opts.caseId !== undefined) body.case_id = opts.caseId;
+      if (opts.eventId !== undefined) body.workflow_event_id = opts.eventId;
+      if (opts.runId !== undefined) body.run_id = opts.runId;
+      if (opts.nodeId !== undefined) body.node_id = opts.nodeId;
+      if (opts.linkType !== undefined) body.link_type = opts.linkType;
+      if (opts.metadata !== undefined) {
+        body.metadata = parseJsonFlag("metadata", opts.metadata) as Record<string, unknown>;
+      }
+      printValue(await client.createCaptureLink(cmd.args[0]!, body), globals);
+    },
+  ) as Command,
+);
+
+captureCommand.addCommand(
+  action(
+    new Command("link-list")
+      .description("List a capture's evidence-graph links. Output (--json): CaptureLink[].")
+      .argument("<id>", "Capture ID"),
+    async ({ client, globals, cmd }) => {
+      printValue(await client.listCaptureLinks(cmd.args[0]!), globals);
+    },
+  ) as Command,
+);
+
+captureCommand.addCommand(
+  action(
+    new Command("link-rm")
+      .description("Detach an evidence-graph link by its id.")
+      .argument("<id>", "Capture ID")
+      .argument("<linkId>", "Link ID"),
+    async ({ client, globals, cmd }) => {
+      await client.deleteCaptureLink(cmd.args[0]!, cmd.args[1]!);
+      printValue({ deleted: cmd.args[1]! }, globals);
+    },
+  ) as Command,
+);

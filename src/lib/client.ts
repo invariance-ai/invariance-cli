@@ -1069,6 +1069,44 @@ export class InvarianceClient {
     return AgentSessionSchema.parse(res.session);
   }
 
+  // ── Capture evidence-graph links ──
+  // Attach a capture to a case/event/run/node via /v1/captures/:id/links.
+  // Distinct from updateCapture({run_id}), which sets the legacy single FK.
+
+  async createCaptureLink(
+    id: string,
+    body: {
+      case_id?: string;
+      workflow_event_id?: string;
+      run_id?: string;
+      node_id?: string;
+      link_type?: string;
+      metadata?: Record<string, unknown>;
+    },
+  ): Promise<unknown> {
+    const res = await this.request<{ link: unknown }>(
+      "POST",
+      `/v1/captures/${encodeURIComponent(id)}/links`,
+      { body },
+    );
+    return (res as { link?: unknown }).link ?? res;
+  }
+
+  async listCaptureLinks(id: string): Promise<unknown[]> {
+    const res = await this.request<{ links: unknown[] }>(
+      "GET",
+      `/v1/captures/${encodeURIComponent(id)}/links`,
+    );
+    return res.links ?? [];
+  }
+
+  async deleteCaptureLink(id: string, linkId: string): Promise<void> {
+    await this.request(
+      "DELETE",
+      `/v1/captures/${encodeURIComponent(id)}/links/${encodeURIComponent(linkId)}`,
+    );
+  }
+
   // ── DNA ──
 
   async listDnaEntities(
