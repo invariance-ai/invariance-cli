@@ -347,3 +347,321 @@ describe("cortex CLI commands", () => {
     errSpy.mockRestore();
   });
 });
+
+const COMPLEX_QUERY_RESULT = {
+  kind: "complex_query",
+  short_answer: "Refund SLAs were met for 9 of 10 cases.",
+  reasoning_plan: ["listed refund cases", "checked sla breaches"],
+  evidence_refs: ["case_1", "case_2"],
+  affected_entities: ["case_5"],
+  confidence: 0.82,
+  restricted_evidence_count: 1,
+  recommended_action: "Review case_5 for the missed SLA.",
+  follow_up_questions: ["Which agent owned case_5?"],
+};
+
+describe("cortex ask", () => {
+  it("launches complex_query (target defaults to project) and prints the cited answer", async () => {
+    process.env.INVARIANCE_API_KEY = "inv_test_key";
+    process.env.INVARIANCE_BASE_URL = BASE;
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      jsonResponse({
+        job_id: "ctxjob_q1",
+        status: "succeeded",
+        mode: "sync",
+        deduplicated: false,
+        result: COMPLEX_QUERY_RESULT,
+        error: null,
+      }),
+    );
+
+    const out = await runCli([
+      "cortex",
+      "ask",
+      "Were refund SLAs met last week?",
+      "--project",
+      "proj_123",
+    ]);
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(String(fetchSpy.mock.calls[0]![0])).toBe(`${BASE}/v1/cortex/jobs/launch`);
+    const init = fetchSpy.mock.calls[0]![1] as RequestInit;
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(init.body as string)).toEqual({
+      project_id: "proj_123",
+      job_kind: "complex_query",
+      target_type: "project",
+      target_ref: "proj_123",
+      question: "Were refund SLAs met last week?",
+      mode: "sync",
+    });
+    expect(out).toContain("Refund SLAs were met for 9 of 10 cases.");
+    expect(out).toContain("case_1, case_2");
+    expect(out).toContain("Review case_5 for the missed SLA.");
+  });
+
+  it("--json prints the full ComplexQueryResult", async () => {
+    process.env.INVARIANCE_API_KEY = "inv_test_key";
+    process.env.INVARIANCE_BASE_URL = BASE;
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      jsonResponse({
+        job_id: "ctxjob_q2",
+        status: "succeeded",
+        mode: "sync",
+        deduplicated: false,
+        result: COMPLEX_QUERY_RESULT,
+      }),
+    );
+    const out = await runCli([
+      "--json",
+      "cortex",
+      "ask",
+      "Were refund SLAs met?",
+      "--project",
+      "proj_123",
+    ]);
+    expect(JSON.parse(out.trimEnd())).toEqual(COMPLEX_QUERY_RESULT);
+  });
+
+  it("anchors on an explicit target and async-polls until succeeded", async () => {
+    process.env.INVARIANCE_API_KEY = "inv_test_key";
+    process.env.INVARIANCE_BASE_URL = BASE;
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      // launch (async, queued)
+      .mockResolvedValueOnce(
+        jsonResponse({
+          job_id: "ctxjob_q3",
+          status: "queued",
+          mode: "async",
+          deduplicated: false,
+        }),
+      )
+      // poll #1: still running
+      .mockResolvedValueOnce(
+        jsonResponse({ job_id: "ctxjob_q3", status: "running", result: null }),
+      )
+      // poll #2: succeeded
+      .mockResolvedValueOnce(
+        jsonResponse({
+          job_id: "ctxjob_q3",
+          status: "succeeded",
+          result: COMPLEX_QUERY_RESULT,
+        }),
+      );
+    vi.spyOn(globalThis, "setTimeout").mockImplementation(((fn: () => void) => {
+      fn();
+      return 0 as unknown as ReturnType<typeof setTimeout>;
+    }) as never);
+
+    const out = await runCli([
+      "cortex",
+      "ask",
+      "Why did this run diverge?",
+      "--project",
+      "proj_123",
+      "--target-type",
+      "run",
+      "--target-ref",
+      "run_1",
+      "--mode",
+      "async",
+    ]);
+
+    expect(fetchSpy).toHaveBeenCalledTimes(3);
+    expect(JSON.parse(fetchSpy.mock.calls[0]![1]!.body as string)).toEqual({
+      project_id: "proj_123",
+      job_kind: "complex_query",
+      target_type: "run",
+      target_ref: "run_1",
+      question: "Why did this run diverge?",
+      mode: "async",
+    });
+    expect(String(fetchSpy.mock.calls[1]![0])).toBe(`${BASE}/v1/cortex/jobs/ctxjob_q3/result`);
+    expect(out).toContain("Refund SLAs were met for 9 of 10 cases.");
+  });
+
+  it("errors clearly when the job fails", async () => {
+    process.env.INVARIANCE_API_KEY = "inv_test_key";
+    process.env.INVARIANCE_BASE_URL = BASE;
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      jsonResponse({
+        job_id: "ctxjob_q4",
+        status: "failed",
+        mode: "sync",
+        deduplicated: false,
+        result: null,
+        error: "tool runtime disabled",
+      }),
+    );
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
+      throw new Error(`process.exit:${code}`);
+    }) as never);
+    const messages: string[] = [];
+    const errSpy = vi.spyOn(console, "error").mockImplementation((...args: unknown[]) => {
+      messages.push(args.map(String).join(" "));
+    });
+    await expect(
+      runCli(["cortex", "ask", "q?", "--project", "proj_123"]),
+    ).rejects.toThrow(/process\.exit/);
+    expect(messages.join("\n")).toContain("failed");
+    exitSpy.mockRestore();
+    errSpy.mockRestore();
+  });
+});
+
+describe("cortex launch / list / retry / runs", () => {
+  it("`cortex launch` POSTs to /v1/cortex/jobs/launch with mode + idempotency key", async () => {
+    process.env.INVARIANCE_API_KEY = "inv_test_key";
+    process.env.INVARIANCE_BASE_URL = BASE;
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      jsonResponse({
+        job_id: "ctxjob_l1",
+        status: "queued",
+        mode: "async",
+        deduplicated: false,
+      }),
+    );
+    const out = await runCli([
+      "--json",
+      "cortex",
+      "launch",
+      "--project",
+      "proj_123",
+      "--kind",
+      "divergence_error_tracking",
+      "--target-type",
+      "project",
+      "--target-ref",
+      "proj_123",
+      "--mode",
+      "async",
+      "--idempotency-key",
+      "key-1",
+    ]);
+    expect(String(fetchSpy.mock.calls[0]![0])).toBe(`${BASE}/v1/cortex/jobs/launch`);
+    expect(JSON.parse(fetchSpy.mock.calls[0]![1]!.body as string)).toEqual({
+      project_id: "proj_123",
+      job_kind: "divergence_error_tracking",
+      target_type: "project",
+      target_ref: "proj_123",
+      mode: "async",
+      idempotency_key: "key-1",
+    });
+    expect(JSON.parse(out.trimEnd())).toEqual({
+      job_id: "ctxjob_l1",
+      status: "queued",
+      mode: "async",
+      deduplicated: false,
+    });
+  });
+
+  it("`cortex launch` defaults mode to sync", async () => {
+    process.env.INVARIANCE_API_KEY = "inv_test_key";
+    process.env.INVARIANCE_BASE_URL = BASE;
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      jsonResponse({
+        job_id: "ctxjob_l2",
+        status: "succeeded",
+        mode: "sync",
+        deduplicated: false,
+        result: COMPLEX_QUERY_RESULT,
+      }),
+    );
+    await runCli([
+      "--json",
+      "cortex",
+      "launch",
+      "--project",
+      "proj_123",
+      "--kind",
+      "complex_query",
+      "--target-type",
+      "run",
+      "--target-ref",
+      "run_1",
+      "--question",
+      "what happened?",
+    ]);
+    expect(JSON.parse(fetchSpy.mock.calls[0]![1]!.body as string)).toEqual({
+      project_id: "proj_123",
+      job_kind: "complex_query",
+      target_type: "run",
+      target_ref: "run_1",
+      mode: "sync",
+      question: "what happened?",
+    });
+  });
+
+  it("`cortex list` GETs /v1/cortex/jobs with status/kind/limit filters", async () => {
+    process.env.INVARIANCE_API_KEY = "inv_test_key";
+    process.env.INVARIANCE_BASE_URL = BASE;
+    const job = {
+      id: "ctxjob_1",
+      project_id: "proj_123",
+      job_kind: "complex_query",
+      target_type: "project",
+      target_ref: "proj_123",
+      status: "succeeded",
+      created_at: "2026-01-01T00:00:00Z",
+      updated_at: "2026-01-01T00:00:01Z",
+    };
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(jsonResponse({ data: [job], next_cursor: "cur_2" }));
+    // printPage -> formatOutput uses console.log for --json, not process.stdout.write.
+    const logged: string[] = [];
+    const logSpy = vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => {
+      logged.push(args.map(String).join(" "));
+    });
+    await runCli([
+      "--json",
+      "cortex",
+      "list",
+      "--status",
+      "succeeded",
+      "--kind",
+      "complex_query",
+      "--limit",
+      "5",
+    ]);
+    logSpy.mockRestore();
+    const url = new URL(String(fetchSpy.mock.calls[0]![0]));
+    expect(url.pathname).toBe("/v1/cortex/jobs");
+    expect(url.searchParams.get("status")).toBe("succeeded");
+    expect(url.searchParams.get("kind")).toBe("complex_query");
+    expect(url.searchParams.get("limit")).toBe("5");
+    expect(JSON.parse(logged.join("\n"))).toEqual({ data: [job], next_cursor: "cur_2" });
+  });
+
+  it("`cortex retry` POSTs /v1/cortex/jobs/:id/retry", async () => {
+    process.env.INVARIANCE_API_KEY = "inv_test_key";
+    process.env.INVARIANCE_BASE_URL = BASE;
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(jsonResponse({ job_id: "ctxjob_9", status: "queued" }));
+    const out = await runCli(["--json", "cortex", "retry", "ctxjob_9"]);
+    expect(String(fetchSpy.mock.calls[0]![0])).toBe(`${BASE}/v1/cortex/jobs/ctxjob_9/retry`);
+    expect((fetchSpy.mock.calls[0]![1] as RequestInit).method).toBe("POST");
+    expect(JSON.parse(out.trimEnd())).toEqual({ job_id: "ctxjob_9", status: "queued" });
+  });
+
+  it("`cortex runs` GETs /v1/cortex/jobs/:id/runs", async () => {
+    process.env.INVARIANCE_API_KEY = "inv_test_key";
+    process.env.INVARIANCE_BASE_URL = BASE;
+    const runs = {
+      runs: [
+        {
+          id: "ctxrun_1",
+          job_id: "ctxjob_9",
+          status: "failed",
+          error: "boom",
+        },
+      ],
+    };
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(jsonResponse(runs));
+    const out = await runCli(["--json", "cortex", "runs", "ctxjob_9"]);
+    expect(String(fetchSpy.mock.calls[0]![0])).toBe(`${BASE}/v1/cortex/jobs/ctxjob_9/runs`);
+    expect(JSON.parse(out.trimEnd())).toEqual(runs);
+  });
+});
