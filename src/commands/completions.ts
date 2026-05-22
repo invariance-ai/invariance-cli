@@ -50,6 +50,8 @@ export const COMMANDS: Record<string, string[]> = {
     "edges",
     "entities",
     "explain-edge",
+    "object-mentions",
+    "objects",
     "promote-candidate",
     "query",
     "reject-candidate",
