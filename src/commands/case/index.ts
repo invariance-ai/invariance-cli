@@ -1,6 +1,6 @@
 import { Command } from "commander";
 import ora from "ora";
-import { action, parseIntFlag, parseJsonFlag, printPage, printValue } from "../../lib/cmd.js";
+import { action, parseIntFlag, parseJsonFlag, parseTagsFlag, printPage, printValue } from "../../lib/cmd.js";
 
 const CASE_COLUMNS = [
   { key: "id", label: "ID", width: 28 },
@@ -34,6 +34,7 @@ caseCommand.addCommand(
       .option("--end-user-id <id>", "Human the workflow is acting on behalf of")
       .option("--owner <name>", "Assigned team or reviewer")
       .option("--custom-attrs <json>", "Domain attributes JSON object")
+      .option("--tags <list>", "Comma-separated tags (e.g. urgent,vip)")
       .option("--opened-at <iso>", "ISO-8601 open time (defaults to now)")
       .addHelpText(
         "after",
@@ -48,6 +49,7 @@ caseCommand.addCommand(
         custom_attrs: parseJsonFlag("custom-attrs", opts.customAttrs) as
           | Record<string, unknown>
           | undefined,
+        tags: parseTagsFlag(opts.tags),
         opened_at: opts.openedAt,
       });
       printValue(c, globals);
@@ -122,7 +124,8 @@ caseCommand.addCommand(
       .option("--end-user-id <id>")
       .option("--workflow-key <key>")
       .option("--status <s>", "open | closed")
-      .option("--outcome <o>"),
+      .option("--outcome <o>")
+      .option("--tags <list>", "Filter by tags (comma-separated; matches ALL)"),
     async ({ client, globals, opts }) => {
       const useSpinner = !globals.json;
       const baseFilters = {
@@ -131,6 +134,7 @@ caseCommand.addCommand(
         workflow_key: opts.workflowKey,
         status: opts.status,
         outcome: opts.outcome,
+        tags: opts.tags,
       };
       if (opts.all) {
         let cursor: string | undefined;
@@ -179,7 +183,8 @@ caseCommand.addCommand(
       .option("--outcome <o>")
       .option("--outcome-value-usd <n>", "Realized $ value", parseFloat)
       .option("--owner <name>")
-      .option("--custom-attrs <json>", "Merged shallowly into existing attrs"),
+      .option("--custom-attrs <json>", "Merged shallowly into existing attrs")
+      .option("--tags <list>", "Replace tags (comma-separated; empty string clears)"),
     async ({ client, globals, opts, cmd }) => {
       const patch: Record<string, unknown> = {};
       if (opts.status) patch.status = opts.status;
@@ -187,6 +192,8 @@ caseCommand.addCommand(
       if (opts.outcomeValueUsd !== undefined) patch.outcome_value_usd = opts.outcomeValueUsd;
       if (opts.owner !== undefined) patch.owner = opts.owner;
       if (opts.customAttrs) patch.custom_attrs = parseJsonFlag("custom-attrs", opts.customAttrs);
+      const tags = parseTagsFlag(opts.tags);
+      if (tags !== undefined) patch.tags = tags;
       printValue(await client.updateCase(cmd.args[0]!, patch), globals);
     },
   ) as Command,

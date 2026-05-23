@@ -76,6 +76,7 @@ export const AgentSessionSchema = z.object({
   title: z.string().nullable().optional(),
   status: z.string().nullable().optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
+  tags: z.array(z.string()).nullable().optional(),
   created_at: z.string(),
   updated_at: z.string().optional(),
 });
@@ -97,6 +98,7 @@ export const CaseSchema = z.object({
   outcome_value_usd: z.number().nullable(),
   owner: z.string().nullable(),
   custom_attrs: z.record(z.string(), z.unknown()),
+  tags: z.array(z.string()).nullable().optional(),
   opened_at: z.string(),
   closed_at: z.string().nullable(),
   created_at: z.string(),
