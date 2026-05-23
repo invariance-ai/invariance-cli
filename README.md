@@ -83,6 +83,8 @@ inv doctor
 | `run metrics <id>` / `verify <id>` | Aggregate metrics / verify proof chain |
 | `run narrative <id>` / `llm-calls <id>` / `nodes <id>` | LLM-generated summary, LLM call log, node list |
 | `node write <run_id>` / `list` / `tail` | Write, list, stream trace nodes |
+| `capture create` / `list` / `get` / `update` | Manage captures — raw observations linkable to runs |
+| `capture link` / `links` / `unlink` | Link a capture to a run/case/event/node, list links, detach |
 | `monitor create` / `list` / `get` / `update` | CRUD monitors |
 | `monitor pause` / `resume` / `evaluate` | Control + trigger monitors |
 | `monitor executions <id>` / `findings <id>` | Inspect monitor output |
@@ -96,6 +98,19 @@ inv doctor
 | `version` | Print the CLI version |
 
 All data commands support `--json` for machine-readable output.
+
+Link a capture to evidence-graph targets:
+
+```sh
+# Legacy: attach to a run by setting run_id
+inv capture link cap_123 --run-id run_abc
+
+# Link to any target — --target-type defaults to run
+inv capture link cap_123 --target-type case --target-id case_xyz --link-type evidence
+
+inv capture links cap_123            # list all links
+inv capture unlink cap_123 --link-id lnk_1
+```
 
 ## For coding agents (Claude Code, Codex, …)
 

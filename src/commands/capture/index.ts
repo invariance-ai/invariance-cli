@@ -114,11 +114,33 @@ captureCommand.addCommand(
 captureCommand.addCommand(
   action(
     new Command("link")
-      .description("Link a capture to a run (PATCH run_id).")
+      .description(
+        "Link a capture to an evidence-graph target. With --run-id alone it PATCHes run_id (legacy); with --target-id it creates a richer link to any target (--target-type defaults to run).",
+      )
       .argument("<id>", "Capture ID")
-      .requiredOption("--run-id <id>", "Run to link"),
+      .option("--run-id <id>", "Legacy: link to a run by setting run_id (PATCH)")
+      .option("--target-type <t>", "Target kind: run | case | workflow_event | node (default run)")
+      .option("--target-id <id>", "Target id to link (creates a capture link)")
+      .option("--link-type <t>", "Link relationship: evidence | source | derived_from | mentions | related")
+      .addHelpText(
+        "after",
+        "\nExamples:\n  $ inv capture link cap_1 --run-id run_9\n  $ inv capture link cap_1 --target-type case --target-id case_2 --link-type evidence\n",
+      ),
     async ({ client, globals, opts, cmd }) => {
-      printValue(await client.updateCapture(cmd.args[0]!, { run_id: opts.runId }), globals);
+      const id = cmd.args[0]!;
+      if (opts.targetId !== undefined) {
+        const link = await client.createCaptureLink(id, {
+          target_type: opts.targetType ?? "run",
+          target_id: opts.targetId,
+          link_type: opts.linkType,
+        });
+        printValue(link, globals);
+        return;
+      }
+      if (opts.runId === undefined) {
+        throw new Error("provide either --run-id (legacy) or --target-id");
+      }
+      printValue(await client.updateCapture(id, { run_id: opts.runId }), globals);
     },
   ) as Command,
 );
@@ -126,11 +148,10 @@ captureCommand.addCommand(
 captureCommand.addCommand(
   action(
     new Command("links")
-      .description("Show the run linked to a capture (prints its run_id).")
+      .description("List every evidence link on a capture (case/run/event/node).")
       .argument("<id>", "Capture ID"),
     async ({ client, globals, cmd }) => {
-      const capture = await client.getCapture(cmd.args[0]!);
-      printValue({ id: capture.id, run_id: capture.run_id ?? null }, globals);
+      printValue(await client.listCaptureLinks(cmd.args[0]!), globals);
     },
   ) as Command,
 );
@@ -138,10 +159,19 @@ captureCommand.addCommand(
 captureCommand.addCommand(
   action(
     new Command("unlink")
-      .description("Remove the run link from a capture (PATCH run_id: null).")
-      .argument("<id>", "Capture ID"),
-    async ({ client, globals, cmd }) => {
-      printValue(await client.updateCapture(cmd.args[0]!, { run_id: null }), globals);
+      .description(
+        "Detach a capture link. With --link-id deletes a specific evidence link; otherwise clears run_id (legacy PATCH).",
+      )
+      .argument("<id>", "Capture ID")
+      .option("--link-id <id>", "Specific capture link id to detach"),
+    async ({ client, globals, opts, cmd }) => {
+      const id = cmd.args[0]!;
+      if (opts.linkId !== undefined) {
+        await client.deleteCaptureLink(id, opts.linkId);
+        printValue({ id, detached: opts.linkId }, globals);
+        return;
+      }
+      printValue(await client.updateCapture(id, { run_id: null }), globals);
     },
   ) as Command,
 );
