@@ -375,6 +375,7 @@ export class InvarianceClient {
     end_user_id?: string;
     owner?: string;
     custom_attrs?: Record<string, unknown>;
+    tags?: string[];
     opened_at?: string;
   }): Promise<Case> {
     const res = await this.request<{ case: unknown }>("POST", "/v1/cases", { body: input });
@@ -388,6 +389,7 @@ export class InvarianceClient {
       workflow_key?: string;
       status?: CaseStatus;
       outcome?: string;
+      tags?: string;
     } = {},
   ): Promise<Page<Case>> {
     return this.parsed(CaseListSchema, "GET", "/v1/cases", {
@@ -399,6 +401,7 @@ export class InvarianceClient {
         workflow_key: opts.workflow_key,
         status: opts.status,
         outcome: opts.outcome,
+        tags: opts.tags,
       },
     });
   }
@@ -1030,6 +1033,7 @@ export class InvarianceClient {
     occurred_at?: string;
     run_id?: string;
     metadata?: Record<string, unknown>;
+    tags?: string[];
   }): Promise<AgentSession> {
     const res = await this.request<{ session: unknown }>("POST", "/v1/captures", { body: input });
     return AgentSessionSchema.parse(
@@ -1044,6 +1048,7 @@ export class InvarianceClient {
       session_type?: string;
       source?: string;
       run_id?: string;
+      tags?: string;
     } = {},
   ): Promise<Page<AgentSession>> {
     const res = await this.request<{ data: unknown[]; next_cursor?: string | null }>(
@@ -1058,6 +1063,7 @@ export class InvarianceClient {
           session_type: opts.session_type,
           source: opts.source,
           run_id: opts.run_id,
+          tags: opts.tags,
         },
       },
     );

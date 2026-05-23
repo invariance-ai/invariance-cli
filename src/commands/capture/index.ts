@@ -1,6 +1,6 @@
 import { Command } from "commander";
 import { readFileSync } from "node:fs";
-import { action, parseIntFlag, parseJsonFlag, printPage, printValue } from "../../lib/cmd.js";
+import { action, parseIntFlag, parseJsonFlag, parseTagsFlag, printPage, printValue } from "../../lib/cmd.js";
 
 const CAPTURE_COLUMNS = [
   { key: "id", label: "ID", width: 28 },
@@ -28,6 +28,7 @@ captureCommand.addCommand(
       .option("--occurred-at <iso>", "ISO-8601 timestamp when the capture occurred")
       .option("--run-id <id>", "Link to an existing run")
       .option("--metadata <json>", "Additional metadata JSON object")
+      .option("--tags <list>", "Comma-separated tags (e.g. meeting,q3)")
       .addHelpText(
         "after",
         "\nExample:\n  $ inv capture create --source manual_note --title 'Demo notes' --content-file notes.md\n",
@@ -43,6 +44,8 @@ captureCommand.addCommand(
       if (opts.occurredAt !== undefined) body.occurred_at = opts.occurredAt;
       if (opts.runId !== undefined) body.run_id = opts.runId;
       if (Object.keys(metadata).length > 0) body.metadata = metadata;
+      const tags = parseTagsFlag(opts.tags);
+      if (tags !== undefined) body.tags = tags;
       printValue(await client.createCapture(body as Parameters<typeof client.createCapture>[0]), globals);
     },
   ) as Command,
@@ -58,6 +61,7 @@ captureCommand.addCommand(
       .option("--capture-type <t>", "Filter by session_type")
       .option("--run-id <id>", "Filter by linked run")
       .option("--operator-id <id>", "Filter by operator")
+      .option("--tags <list>", "Filter by tags (comma-separated; matches ALL)")
       .option("--limit <n>", "Page size", parseIntFlag)
       .option("--cursor <c>", "Opaque pagination token"),
     async ({ client, globals, opts }) => {
@@ -66,6 +70,7 @@ captureCommand.addCommand(
         session_type: opts.captureType,
         run_id: opts.runId,
         operator_id: opts.operatorId,
+        tags: opts.tags,
         cursor: opts.cursor,
         limit: opts.limit,
       });
@@ -92,12 +97,15 @@ captureCommand.addCommand(
       .argument("<id>", "Capture ID")
       .option("--status <s>", "New status")
       .option("--run-id <id>", "Link to a run (or pass empty string to clear)")
-      .option("--metadata <json>", "Metadata JSON object (merged shallowly)"),
+      .option("--metadata <json>", "Metadata JSON object (merged shallowly)")
+      .option("--tags <list>", "Replace tags (comma-separated; empty string clears)"),
     async ({ client, globals, opts, cmd }) => {
       const patch: Record<string, unknown> = {};
       if (opts.status !== undefined) patch.status = opts.status;
       if (opts.runId !== undefined) patch.run_id = opts.runId;
       if (opts.metadata !== undefined) patch.metadata = parseJsonFlag("metadata", opts.metadata);
+      const tags = parseTagsFlag(opts.tags);
+      if (tags !== undefined) patch.tags = tags;
       printValue(await client.updateCapture(cmd.args[0]!, patch), globals);
     },
   ) as Command,

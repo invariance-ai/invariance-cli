@@ -38,6 +38,14 @@ export function parseIntFlag(value: string): number {
   return n;
 }
 
+/** Parse a comma-separated `--tags` flag into a trimmed, non-empty string[].
+ *  Returns undefined when the flag is absent so callers can omit the field. */
+export function parseTagsFlag(value: string | undefined): string[] | undefined {
+  if (value === undefined) return undefined;
+  const tags = value.split(",").map((t) => t.trim()).filter(Boolean);
+  return tags.length > 0 ? tags : [];
+}
+
 export function parseJsonFlag(name: string, value: string | undefined): unknown {
   if (value === undefined) return undefined;
   try {

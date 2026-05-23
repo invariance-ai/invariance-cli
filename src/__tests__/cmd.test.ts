@@ -1,6 +1,20 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { printValue } from "../lib/cmd.js";
+import { printValue, parseTagsFlag } from "../lib/cmd.js";
 import type { GlobalOptions } from "../types/index.js";
+
+describe("parseTagsFlag", () => {
+  it("returns undefined when the flag is absent", () => {
+    expect(parseTagsFlag(undefined)).toBeUndefined();
+  });
+
+  it("splits, trims, and drops empties", () => {
+    expect(parseTagsFlag("meeting, q3 ,, urgent")).toEqual(["meeting", "q3", "urgent"]);
+  });
+
+  it("returns [] for an empty string so callers can clear tags", () => {
+    expect(parseTagsFlag("")).toEqual([]);
+  });
+});
 
 describe("printValue", () => {
   let writeSpy: ReturnType<typeof vi.spyOn>;
