@@ -769,6 +769,8 @@ export const CortexJobKindSchema = z.enum([
   "recommendation_impact_eval",
   "prompt_variant_eval",
   "policy_eval",
+  "divergence_error_tracking",
+  "complex_query",
 ]);
 export type CortexJobKind = z.infer<typeof CortexJobKindSchema>;
 
@@ -782,8 +784,16 @@ export const CortexTargetTypeSchema = z.enum([
   "policy",
   "recommendation",
   "external",
+  "finding",
+  "review",
+  "eval_run",
+  "project",
 ]);
 export type CortexTargetType = z.infer<typeof CortexTargetTypeSchema>;
+
+/** How a launched job runs: `sync` blocks and returns the result; `async` enqueues. */
+export const CortexLaunchModeSchema = z.enum(["sync", "async"]);
+export type CortexLaunchMode = z.infer<typeof CortexLaunchModeSchema>;
 
 export const CortexJobStatusSchema = z.enum([
   "queued",
@@ -795,6 +805,14 @@ export const CortexJobStatusSchema = z.enum([
   "cancelled",
 ]);
 export type CortexJobStatus = z.infer<typeof CortexJobStatusSchema>;
+
+/** Terminal lifecycle states — a job is done when it reaches one of these. */
+export const CORTEX_TERMINAL_STATUSES: readonly CortexJobStatus[] = [
+  "succeeded",
+  "failed",
+  "dead",
+  "cancelled",
+];
 
 /**
  * Server-side accepted shape for `POST /v1/cortex/jobs`. Mirrors the plan in
@@ -840,6 +858,120 @@ export const CortexJobResultSchema = z.object({
   error: z.string().nullable().optional(),
 });
 export type CortexJobResult = z.infer<typeof CortexJobResultSchema>;
+
+// ── Cortex governed launcher (launch / list / retry / runs) ──
+
+/**
+ * Input to the governed launcher (`POST /v1/cortex/jobs/launch`). Same shape as
+ * {@link CortexJobCreateRequest} plus `mode` (run now vs. enqueue) and an
+ * optional `idempotency_key` for dedup.
+ */
+export interface CortexLaunchJobRequest extends CortexJobCreateRequest {
+  mode: CortexLaunchMode;
+  idempotency_key?: string | null;
+}
+
+/**
+ * Response from the launcher. For `sync` launches the parsed `result` (or
+ * `error`) is embedded once the job ran; `async` launches return the queued job.
+ */
+export const CortexLaunchJobResponseSchema = z.object({
+  job_id: z.string(),
+  status: CortexJobStatusSchema,
+  mode: CortexLaunchModeSchema,
+  deduplicated: z.boolean(),
+  result: z.record(z.string(), z.unknown()).nullable().optional(),
+  error: z.string().nullable().optional(),
+});
+export type CortexLaunchJobResponse = z.infer<typeof CortexLaunchJobResponseSchema>;
+
+/** Page of jobs from `GET /v1/cortex/jobs`. */
+export const CortexJobListSchema = z.object({
+  data: z.array(CortexJobSchema),
+  next_cursor: z.string().nullable().optional(),
+});
+export type CortexJobList = z.infer<typeof CortexJobListSchema>;
+
+export const CortexRetryJobResponseSchema = z.object({
+  job_id: z.string(),
+  status: CortexJobStatusSchema,
+});
+export type CortexRetryJobResponse = z.infer<typeof CortexRetryJobResponseSchema>;
+
+/** One attempt at running a job (the `cortex_job_runs` audit-trail row). */
+export const CortexJobRunSchema = z.object({
+  id: z.string(),
+  job_id: z.string(),
+  project_id: z.string().optional(),
+  job_kind: CortexJobKindSchema.optional(),
+  prompt_spec_id: z.string().nullable().optional(),
+  prompt_key: z.string().nullable().optional(),
+  prompt_version: z.number().nullable().optional(),
+  model: z.string().nullable().optional(),
+  status: z.enum(["running", "succeeded", "failed", "cancelled"]),
+  output_refs: z.record(z.string(), z.unknown()).optional(),
+  metrics: z.record(z.string(), z.unknown()).optional(),
+  error: z.string().nullable().optional(),
+  started_at: z.string().optional(),
+  finished_at: z.string().nullable().optional(),
+  latency_ms: z.number().nullable().optional(),
+});
+export type CortexJobRun = z.infer<typeof CortexJobRunSchema>;
+
+export const CortexJobRunListSchema = z.object({
+  runs: z.array(CortexJobRunSchema),
+});
+export type CortexJobRunList = z.infer<typeof CortexJobRunListSchema>;
+
+// ── Cortex result shapes (defined locally pending shared types) ──
+
+/**
+ * Result of the read-only `complex_query` analyst. Every id in `evidence_refs`
+ * and `affected_entities` was observed through a governed read tool — the
+ * runtime fails closed against fabricated or cross-project ids.
+ */
+export interface ComplexQueryResult {
+  kind: "complex_query";
+  /** Direct answer to the question. */
+  short_answer: string;
+  /** Ordered steps the analyst took to reach the answer. */
+  reasoning_plan: string[];
+  /** Observed ids the answer is grounded in. */
+  evidence_refs: string[];
+  /** Observed ids the answer is about. */
+  affected_entities: string[];
+  confidence: number;
+  /** Count of ACL-filtered evidence items withheld, never returned. */
+  restricted_evidence_count: number;
+  recommended_action: string;
+  follow_up_questions: string[];
+}
+
+/** One high-frequency error surfaced by a `divergence_error_tracking` job. */
+export interface DivergenceTopError {
+  run_id: string;
+  kind: string;
+  severity: string;
+  status: string;
+  title: string;
+  summary: string;
+  suggested_action: string | null;
+}
+
+export interface DivergenceErrorTrackingResult {
+  kind: "divergence_error_tracking";
+  target_type: CortexTargetType;
+  target_ref: string;
+  total_divergences: number;
+  open_divergences: number;
+  critical_open_divergences: number;
+  by_kind: Record<string, number>;
+  by_severity: Record<string, number>;
+  by_status: Record<string, number>;
+  affected_run_ids: string[];
+  top_errors: DivergenceTopError[];
+  recommended_actions: string[];
+}
 
 // ── CLI global options ──
 

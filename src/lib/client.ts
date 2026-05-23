@@ -80,10 +80,21 @@ import {
   CortexJobCreateResponseSchema,
   CortexJobSchema,
   CortexJobResultSchema,
+  CortexLaunchJobResponseSchema,
+  CortexJobListSchema,
+  CortexRetryJobResponseSchema,
+  CortexJobRunListSchema,
   type CortexJob,
   type CortexJobCreateRequest,
   type CortexJobCreateResponse,
   type CortexJobResult,
+  type CortexLaunchJobRequest,
+  type CortexLaunchJobResponse,
+  type CortexJobList,
+  type CortexJobKind,
+  type CortexJobStatus,
+  type CortexRetryJobResponse,
+  type CortexJobRunList,
 } from "../types/index.js";
 import { ApiError, AuthenticationError, NetworkError, NotFoundError } from "./errors.js";
 import {
@@ -1240,6 +1251,52 @@ export class InvarianceClient {
       CortexJobResultSchema,
       "GET",
       `/v1/cortex/jobs/${encodeURIComponent(id)}/result`,
+    );
+  }
+
+  // ── Cortex governed launcher (launch / list / retry / runs) ──
+
+  /**
+   * Launch a Cortex job through the governed launcher. With `mode: "sync"` the
+   * call blocks and returns the parsed `result`; with `mode: "async"` it enqueues
+   * and returns the queued job — poll {@link getCortexJobResult}. This is the path
+   * the read-only `complex_query` analyst requires.
+   */
+  async launchCortexJob(input: CortexLaunchJobRequest): Promise<CortexLaunchJobResponse> {
+    return this.parsed(CortexLaunchJobResponseSchema, "POST", "/v1/cortex/jobs/launch", {
+      body: input,
+    });
+  }
+
+  /** List Cortex jobs, newest first. Filter by `status` / `kind`. */
+  async listCortexJobs(
+    opts: PageOptions & { status?: CortexJobStatus; kind?: CortexJobKind } = {},
+  ): Promise<CortexJobList> {
+    return this.parsed(CortexJobListSchema, "GET", "/v1/cortex/jobs", {
+      params: {
+        cursor: opts.cursor,
+        limit: opts.limit,
+        status: opts.status,
+        kind: opts.kind,
+      },
+    });
+  }
+
+  /** Re-queue a failed/dead job for one more attempt. */
+  async retryCortexJob(id: string): Promise<CortexRetryJobResponse> {
+    return this.parsed(
+      CortexRetryJobResponseSchema,
+      "POST",
+      `/v1/cortex/jobs/${encodeURIComponent(id)}/retry`,
+    );
+  }
+
+  /** List the attempt history (audit-trail runs) for a job. */
+  async listCortexJobRuns(id: string): Promise<CortexJobRunList> {
+    return this.parsed(
+      CortexJobRunListSchema,
+      "GET",
+      `/v1/cortex/jobs/${encodeURIComponent(id)}/runs`,
     );
   }
 }
