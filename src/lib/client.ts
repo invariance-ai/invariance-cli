@@ -1090,6 +1090,45 @@ export class InvarianceClient {
     return AgentSessionSchema.parse(res.session);
   }
 
+  // Create a capture link against any evidence-graph target. Accepts the
+  // polymorphic target_type/target_id form (target_type defaults to 'run'
+  // server-side) plus an optional link_type/metadata.
+  async createCaptureLink(
+    id: string,
+    input: {
+      target_type?: string;
+      target_id?: string;
+      run_id?: string;
+      case_id?: string;
+      workflow_event_id?: string;
+      node_id?: string;
+      link_type?: string;
+      metadata?: Record<string, unknown>;
+    },
+  ): Promise<unknown> {
+    const res = await this.request<{ link: unknown }>(
+      "POST",
+      `/v1/captures/${encodeURIComponent(id)}/links`,
+      { body: input },
+    );
+    return (res as { link?: unknown }).link ?? res;
+  }
+
+  async listCaptureLinks(id: string): Promise<unknown[]> {
+    const res = await this.request<{ links: unknown[] }>(
+      "GET",
+      `/v1/captures/${encodeURIComponent(id)}/links`,
+    );
+    return res.links ?? [];
+  }
+
+  async deleteCaptureLink(id: string, linkId: string): Promise<void> {
+    await this.request<void>(
+      "DELETE",
+      `/v1/captures/${encodeURIComponent(id)}/links/${encodeURIComponent(linkId)}`,
+    );
+  }
+
   // ── DNA ──
 
   async listDnaEntities(
