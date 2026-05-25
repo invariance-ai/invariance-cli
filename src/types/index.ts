@@ -973,6 +973,331 @@ export interface DivergenceErrorTrackingResult {
   recommended_actions: string[];
 }
 
+// ── Workflow observability (read-only rollups) ──
+
+export const WorkflowObservabilityRollupSchema = z.object({
+  workflow_key: z.string(),
+  execution_count: z.number(),
+  open_count: z.number(),
+  closed_count: z.number(),
+  stale_open_count: z.number(),
+  missing_outcome_count: z.number(),
+  failed_run_count: z.number(),
+  node_error_count: z.number(),
+  event_count: z.number(),
+  run_count: z.number(),
+  capture_count: z.number(),
+  node_count: z.number(),
+  executions_with_events: z.number(),
+  executions_with_runs: z.number(),
+  executions_with_captures: z.number(),
+  executions_with_nodes: z.number(),
+  total_cost_usd: z.number(),
+  total_input_tokens: z.number(),
+  total_output_tokens: z.number(),
+  avg_duration_ms: z.number().nullable(),
+  first_seen_at: z.string().nullable(),
+  last_seen_at: z.string().nullable(),
+});
+export type WorkflowObservabilityRollup = z.infer<typeof WorkflowObservabilityRollupSchema>;
+
+export const WorkflowHealthStatusSchema = z.enum(["healthy", "degraded", "unhealthy", "unknown"]);
+export type WorkflowHealthStatus = z.infer<typeof WorkflowHealthStatusSchema>;
+
+export const WorkflowExecutionHealthSchema = z.object({
+  case_id: z.string(),
+  workflow_key: z.string(),
+  status: CaseStatusSchema,
+  opened_at: z.string(),
+  closed_at: z.string().nullable(),
+  last_seen_at: z.string().nullable(),
+  stale: z.boolean(),
+  health: WorkflowHealthStatusSchema,
+  reasons: z.array(z.string()),
+  event_count: z.number(),
+  run_count: z.number(),
+  capture_count: z.number(),
+  node_count: z.number(),
+  error_count: z.number(),
+  total_cost_usd: z.number(),
+  total_tokens: z.number(),
+  evidence_mix: z.object({
+    events: z.boolean(),
+    runs: z.boolean(),
+    captures: z.boolean(),
+    nodes: z.boolean(),
+  }),
+});
+export type WorkflowExecutionHealth = z.infer<typeof WorkflowExecutionHealthSchema>;
+
+export const WorkflowObservabilityRollupListSchema = ListSchema(WorkflowObservabilityRollupSchema);
+export const WorkflowExecutionHealthListSchema = ListSchema(WorkflowExecutionHealthSchema);
+
+// ── Divergences (run-level deviations: read + status patch) ──
+
+export const DivergenceKindSchema = z.enum([
+  "intent",
+  "policy",
+  "workflow",
+  "context",
+  "outcome",
+  "behavior_drift",
+  "memory_consistency",
+]);
+export type DivergenceKind = z.infer<typeof DivergenceKindSchema>;
+
+export const DivergenceStatusSchema = z.enum([
+  "open",
+  "accepted",
+  "dismissed",
+  "converted_to_monitor",
+]);
+export type DivergenceStatus = z.infer<typeof DivergenceStatusSchema>;
+
+export const DivergenceSchema = z.object({
+  id: z.string(),
+  agent_id: z.string(),
+  run_id: z.string(),
+  kind: DivergenceKindSchema,
+  severity: SeveritySchema,
+  title: z.string(),
+  summary: z.string(),
+  expected: z.record(z.string(), z.unknown()),
+  observed: z.record(z.string(), z.unknown()),
+  evidence: z.record(z.string(), z.unknown()),
+  suggested_action: z.string().nullable(),
+  confidence: z.number(),
+  status: DivergenceStatusSchema,
+  created_at: z.string(),
+  updated_at: z.string(),
+});
+export type Divergence = z.infer<typeof DivergenceSchema>;
+export const DivergenceListSchema = ListSchema(DivergenceSchema);
+
+// ── Saved views (dashboard queries: full CRUD + run) ──
+
+export const QuerySourceSchema = z.enum(["executions", "events", "runs", "nodes", "captures"]);
+export type QuerySource = z.infer<typeof QuerySourceSchema>;
+
+export const QueryAggregationSchema = z.enum([
+  "count",
+  "sum",
+  "avg",
+  "min",
+  "max",
+  "count_distinct",
+]);
+export type QueryAggregation = z.infer<typeof QueryAggregationSchema>;
+
+export const QueryFilterOpSchema = z.enum(["eq", "neq", "in", "gt", "gte", "lt", "lte"]);
+export type QueryFilterOp = z.infer<typeof QueryFilterOpSchema>;
+
+export const DashboardVizSchema = z.enum(["table", "metric", "bar", "line", "list"]);
+export type DashboardViz = z.infer<typeof DashboardVizSchema>;
+
+export const SavedViewVisibilitySchema = z.enum(["agent", "private"]);
+export type SavedViewVisibility = z.infer<typeof SavedViewVisibilitySchema>;
+
+export const QueryFilterSchema = z.object({
+  field: z.string(),
+  op: QueryFilterOpSchema,
+  value: z.union([
+    z.string(),
+    z.number(),
+    z.boolean(),
+    z.array(z.union([z.string(), z.number(), z.boolean()])),
+    z.null(),
+  ]),
+});
+export type QueryFilter = z.infer<typeof QueryFilterSchema>;
+
+export const QuerySpecSchema = z.object({
+  fields: z.array(z.string()).optional(),
+  filters: z.array(QueryFilterSchema).optional(),
+  group_by: z.string().optional(),
+  aggregation: QueryAggregationSchema.optional(),
+  aggregation_field: z.string().optional(),
+  order_by: z.string().optional(),
+  order_dir: z.enum(["asc", "desc"]).optional(),
+  limit: z.number().optional(),
+});
+export type QuerySpec = z.infer<typeof QuerySpecSchema>;
+
+export const SavedViewSchema = z.object({
+  id: z.string(),
+  agent_id: z.string(),
+  name: z.string(),
+  source: QuerySourceSchema,
+  spec: QuerySpecSchema,
+  viz: DashboardVizSchema,
+  visibility: SavedViewVisibilitySchema,
+  created_at: z.string(),
+  updated_at: z.string(),
+});
+export type SavedView = z.infer<typeof SavedViewSchema>;
+export const SavedViewListSchema = ListSchema(SavedViewSchema);
+
+export const QueryResultGroupSchema = z.object({
+  key: z.union([z.string(), z.number(), z.null()]),
+  value: z.number(),
+});
+export type QueryResultGroup = z.infer<typeof QueryResultGroupSchema>;
+
+export const QueryResultSchema = z.object({
+  source: QuerySourceSchema,
+  scalar: z.number().optional(),
+  groups: z.array(QueryResultGroupSchema).optional(),
+  rows: z.array(z.record(z.string(), z.unknown())).optional(),
+  row_count: z.number(),
+  truncated: z.boolean(),
+});
+export type QueryResult = z.infer<typeof QueryResultSchema>;
+
+export interface CreateSavedViewRequest {
+  name: string;
+  source: QuerySource;
+  spec: QuerySpec;
+  viz?: DashboardViz;
+  visibility?: SavedViewVisibility;
+}
+
+export interface UpdateSavedViewRequest {
+  name?: string;
+  source?: QuerySource;
+  spec?: QuerySpec;
+  viz?: DashboardViz;
+  visibility?: SavedViewVisibility;
+}
+
+export type RunQueryRequest = { saved_view_id: string } | { source: QuerySource; spec: QuerySpec };
+
+// ── External receipts (writes require an agent API key) ──
+
+export const ExternalReceiptSourceSchema = z.enum([
+  "stripe",
+  "zendesk",
+  "salesforce",
+  "hubspot",
+  "slack",
+  "linear",
+  "jira",
+  "webhook",
+  "jsonl",
+  "csv",
+  "custom",
+]);
+export type ExternalReceiptSource = z.infer<typeof ExternalReceiptSourceSchema>;
+
+export const ExternalReceiptCorrelationKeysSchema = z.record(
+  z.string(),
+  z.string().optional(),
+);
+export type ExternalReceiptCorrelationKeys = z.infer<
+  typeof ExternalReceiptCorrelationKeysSchema
+>;
+
+export const ExternalReceiptSchema = z.object({
+  id: z.string(),
+  agent_id: z.string(),
+  run_id: z.string().nullable(),
+  node_id: z.string().nullable(),
+  source: ExternalReceiptSourceSchema,
+  kind: z.string(),
+  external_id: z.string().nullable(),
+  occurred_at: z.string().nullable(),
+  business_object_type: z.string().nullable(),
+  business_object_id: z.string().nullable(),
+  subject_type: z.string().nullable(),
+  subject_id: z.string().nullable(),
+  correlation_keys: ExternalReceiptCorrelationKeysSchema,
+  payload: z.record(z.string(), z.unknown()),
+  metadata: z.record(z.string(), z.unknown()),
+  hash: z.string(),
+  created_at: z.string(),
+  updated_at: z.string(),
+});
+export type ExternalReceipt = z.infer<typeof ExternalReceiptSchema>;
+export const ExternalReceiptListSchema = ListSchema(ExternalReceiptSchema);
+
+export interface CreateExternalReceiptRequest {
+  source: ExternalReceiptSource;
+  kind: string;
+  run_id?: string;
+  node_id?: string;
+  external_id?: string;
+  occurred_at?: string;
+  business_object_type?: string;
+  business_object_id?: string;
+  subject_type?: string;
+  subject_id?: string;
+  correlation_keys?: ExternalReceiptCorrelationKeys;
+  payload?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
+}
+
+// ── Knowledge base (pages + chat sessions/messages) ──
+
+export const KbPageSchema = z.object({
+  id: z.string(),
+  agent_id: z.string(),
+  title: z.string(),
+  slug: z.string().nullable().optional(),
+  content: z.string(),
+  tags: z.array(z.string()).nullable().optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+  created_at: z.string(),
+  updated_at: z.string(),
+});
+export type KbPage = z.infer<typeof KbPageSchema>;
+export const KbPageListSchema = ListSchema(KbPageSchema);
+
+export const KbSessionSchema = z.object({
+  id: z.string(),
+  agent_id: z.string(),
+  title: z.string().nullable().optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+  created_at: z.string(),
+  updated_at: z.string(),
+});
+export type KbSession = z.infer<typeof KbSessionSchema>;
+export const KbSessionListSchema = ListSchema(KbSessionSchema);
+
+export const KbMessageRoleSchema = z.enum(["user", "assistant", "system"]);
+export type KbMessageRole = z.infer<typeof KbMessageRoleSchema>;
+
+export const KbMessageSchema = z.object({
+  id: z.string(),
+  session_id: z.string(),
+  role: KbMessageRoleSchema,
+  content: z.string(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+  created_at: z.string(),
+});
+export type KbMessage = z.infer<typeof KbMessageSchema>;
+export const KbMessageListSchema = ListSchema(KbMessageSchema);
+
+// ── Node types (custom node-type registry) ──
+
+export const NodeTypeSchema = z.object({
+  name: z.string(),
+  agent_id: z.string().nullable().optional(),
+  display_name: z.string().nullable().optional(),
+  custom_fields_schema: z.record(z.string(), z.unknown()).nullable().optional(),
+  aggregation_hints: z.record(z.string(), z.unknown()).nullable().optional(),
+  builtin: z.boolean().optional(),
+  created_at: z.string().optional(),
+  updated_at: z.string().optional(),
+});
+export type NodeType = z.infer<typeof NodeTypeSchema>;
+export const NodeTypeListSchema = ListSchema(NodeTypeSchema);
+
+export interface CreateNodeTypeRequest {
+  name: string;
+  display_name?: string;
+  custom_fields_schema?: Record<string, unknown>;
+  aggregation_hints?: Record<string, unknown>;
+}
+
 // ── CLI global options ──
 
 export interface GlobalOptions {

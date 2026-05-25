@@ -95,6 +95,42 @@ import {
   type CortexJobStatus,
   type CortexRetryJobResponse,
   type CortexJobRunList,
+  WorkflowObservabilityRollupSchema,
+  WorkflowObservabilityRollupListSchema,
+  WorkflowExecutionHealthListSchema,
+  DivergenceSchema,
+  DivergenceListSchema,
+  SavedViewSchema,
+  SavedViewListSchema,
+  QueryResultSchema,
+  ExternalReceiptSchema,
+  ExternalReceiptListSchema,
+  KbPageSchema,
+  KbPageListSchema,
+  KbSessionSchema,
+  KbSessionListSchema,
+  KbMessageSchema,
+  KbMessageListSchema,
+  NodeTypeSchema,
+  NodeTypeListSchema,
+  type WorkflowObservabilityRollup,
+  type WorkflowExecutionHealth,
+  type Divergence,
+  type DivergenceKind,
+  type DivergenceStatus,
+  type SavedView,
+  type QueryResult,
+  type CreateSavedViewRequest,
+  type UpdateSavedViewRequest,
+  type RunQueryRequest,
+  type ExternalReceipt,
+  type ExternalReceiptSource,
+  type CreateExternalReceiptRequest,
+  type KbPage,
+  type KbSession,
+  type KbMessage,
+  type NodeType,
+  type CreateNodeTypeRequest,
 } from "../types/index.js";
 import { ApiError, AuthenticationError, NetworkError, NotFoundError } from "./errors.js";
 import {
@@ -1337,6 +1373,279 @@ export class InvarianceClient {
       "GET",
       `/v1/cortex/jobs/${encodeURIComponent(id)}/runs`,
     );
+  }
+
+  // ── Workflow observability (read-only rollups) ──
+
+  async listWorkflowObservability(): Promise<Page<WorkflowObservabilityRollup>> {
+    return this.parsed(
+      WorkflowObservabilityRollupListSchema,
+      "GET",
+      "/v1/workflow-observability",
+    );
+  }
+
+  async getWorkflowObservability(workflowKey: string): Promise<WorkflowObservabilityRollup> {
+    const res = await this.request<{ rollup: unknown }>(
+      "GET",
+      `/v1/workflow-observability/${encodeURIComponent(workflowKey)}`,
+    );
+    return WorkflowObservabilityRollupSchema.parse(res.rollup);
+  }
+
+  async listWorkflowExecutions(workflowKey: string): Promise<Page<WorkflowExecutionHealth>> {
+    return this.parsed(
+      WorkflowExecutionHealthListSchema,
+      "GET",
+      `/v1/workflow-observability/${encodeURIComponent(workflowKey)}/executions`,
+    );
+  }
+
+  // ── Divergences (run-level deviations) ──
+
+  async listDivergences(
+    opts: PageOptions & {
+      run_id?: string;
+      kind?: DivergenceKind;
+      severity?: Severity;
+      status?: DivergenceStatus;
+    } = {},
+  ): Promise<Page<Divergence>> {
+    return this.parsed(DivergenceListSchema, "GET", "/v1/divergences", {
+      params: {
+        cursor: opts.cursor,
+        limit: opts.limit,
+        run_id: opts.run_id,
+        kind: opts.kind,
+        severity: opts.severity,
+        status: opts.status,
+      },
+    });
+  }
+
+  async getDivergence(id: string): Promise<Divergence> {
+    const res = await this.request<{ divergence: unknown }>(
+      "GET",
+      `/v1/divergences/${encodeURIComponent(id)}`,
+    );
+    return DivergenceSchema.parse(res.divergence);
+  }
+
+  async updateDivergence(id: string, status: DivergenceStatus): Promise<Divergence> {
+    const res = await this.request<{ divergence: unknown }>(
+      "PATCH",
+      `/v1/divergences/${encodeURIComponent(id)}`,
+      { body: { status } },
+    );
+    return DivergenceSchema.parse(res.divergence);
+  }
+
+  // ── Saved views (dashboard queries) ──
+
+  async listSavedViews(): Promise<Page<SavedView>> {
+    return this.parsed(SavedViewListSchema, "GET", "/v1/saved-views");
+  }
+
+  async createSavedView(body: CreateSavedViewRequest): Promise<SavedView> {
+    const res = await this.request<{ view: unknown }>("POST", "/v1/saved-views", { body });
+    return SavedViewSchema.parse(res.view);
+  }
+
+  async getSavedView(id: string): Promise<SavedView> {
+    const res = await this.request<{ view: unknown }>(
+      "GET",
+      `/v1/saved-views/${encodeURIComponent(id)}`,
+    );
+    return SavedViewSchema.parse(res.view);
+  }
+
+  async updateSavedView(id: string, patch: UpdateSavedViewRequest): Promise<SavedView> {
+    const res = await this.request<{ view: unknown }>(
+      "PATCH",
+      `/v1/saved-views/${encodeURIComponent(id)}`,
+      { body: patch },
+    );
+    return SavedViewSchema.parse(res.view);
+  }
+
+  async deleteSavedView(id: string): Promise<void> {
+    await this.request<void>("DELETE", `/v1/saved-views/${encodeURIComponent(id)}`);
+  }
+
+  /**
+   * Run a saved view or an ad-hoc query. `body` must specify EXACTLY ONE of
+   * `{ saved_view_id }` or `{ source, spec }`; this is validated client-side.
+   */
+  async runSavedView(body: RunQueryRequest): Promise<QueryResult> {
+    const hasId = "saved_view_id" in body && body.saved_view_id !== undefined;
+    const hasSpec = "source" in body && body.source !== undefined;
+    if (hasId === hasSpec) {
+      throw new Error(
+        "runSavedView requires exactly one of { saved_view_id } or { source, spec }.",
+      );
+    }
+    const res = await this.request<{ result: unknown }>("POST", "/v1/saved-views/run", { body });
+    return QueryResultSchema.parse(res.result);
+  }
+
+  // ── External receipts (writes require an agent API key) ──
+
+  async createReceipt(body: CreateExternalReceiptRequest): Promise<ExternalReceipt> {
+    const res = await this.request<{ receipt: unknown }>("POST", "/v1/receipts", { body });
+    return ExternalReceiptSchema.parse(res.receipt);
+  }
+
+  async createReceiptsBatch(
+    receipts: CreateExternalReceiptRequest[],
+  ): Promise<ExternalReceipt[]> {
+    const res = await this.request<{ receipts: unknown[] }>("POST", "/v1/receipts/batch", {
+      body: { receipts },
+    });
+    return res.receipts.map((r) => ExternalReceiptSchema.parse(r));
+  }
+
+  async listReceipts(
+    opts: PageOptions & {
+      run_id?: string;
+      node_id?: string;
+      source?: ExternalReceiptSource;
+      kind?: string;
+      external_id?: string;
+      business_object_type?: string;
+      business_object_id?: string;
+    } = {},
+  ): Promise<Page<ExternalReceipt>> {
+    return this.parsed(ExternalReceiptListSchema, "GET", "/v1/receipts", {
+      params: {
+        cursor: opts.cursor,
+        limit: opts.limit,
+        run_id: opts.run_id,
+        node_id: opts.node_id,
+        source: opts.source,
+        kind: opts.kind,
+        external_id: opts.external_id,
+        business_object_type: opts.business_object_type,
+        business_object_id: opts.business_object_id,
+      },
+    });
+  }
+
+  async getReceipt(id: string): Promise<ExternalReceipt> {
+    const res = await this.request<{ receipt: unknown }>(
+      "GET",
+      `/v1/receipts/${encodeURIComponent(id)}`,
+    );
+    return ExternalReceiptSchema.parse(res.receipt);
+  }
+
+  // ── Knowledge base: pages ──
+
+  async listKbPages(opts: PageOptions & { q?: string; tag?: string } = {}): Promise<Page<KbPage>> {
+    return this.parsed(KbPageListSchema, "GET", "/v1/kb/pages", {
+      params: { cursor: opts.cursor, limit: opts.limit, q: opts.q, tag: opts.tag },
+    });
+  }
+
+  async getKbPage(id: string): Promise<KbPage> {
+    const res = await this.request<{ page: unknown }>(
+      "GET",
+      `/v1/kb/pages/${encodeURIComponent(id)}`,
+    );
+    return KbPageSchema.parse(res.page);
+  }
+
+  async createKbPage(body: {
+    title: string;
+    content: string;
+    slug?: string;
+    tags?: string[];
+    metadata?: Record<string, unknown>;
+  }): Promise<KbPage> {
+    const res = await this.request<{ page: unknown }>("POST", "/v1/kb/pages", { body });
+    return KbPageSchema.parse(res.page);
+  }
+
+  async updateKbPage(id: string, patch: Record<string, unknown>): Promise<KbPage> {
+    const res = await this.request<{ page: unknown }>(
+      "PATCH",
+      `/v1/kb/pages/${encodeURIComponent(id)}`,
+      { body: patch },
+    );
+    return KbPageSchema.parse(res.page);
+  }
+
+  async deleteKbPage(id: string): Promise<void> {
+    await this.request<void>("DELETE", `/v1/kb/pages/${encodeURIComponent(id)}`);
+  }
+
+  // ── Knowledge base: sessions + messages ──
+
+  async createKbSession(body: {
+    title?: string;
+    metadata?: Record<string, unknown>;
+  }): Promise<KbSession> {
+    const res = await this.request<{ session: unknown }>("POST", "/v1/kb/sessions", { body });
+    return KbSessionSchema.parse(res.session);
+  }
+
+  async listKbSessions(opts: PageOptions = {}): Promise<Page<KbSession>> {
+    return this.parsed(KbSessionListSchema, "GET", "/v1/kb/sessions", {
+      params: { cursor: opts.cursor, limit: opts.limit },
+    });
+  }
+
+  async getKbSession(id: string): Promise<KbSession> {
+    const res = await this.request<{ session: unknown }>(
+      "GET",
+      `/v1/kb/sessions/${encodeURIComponent(id)}`,
+    );
+    return KbSessionSchema.parse(res.session);
+  }
+
+  async deleteKbSession(id: string): Promise<void> {
+    await this.request<void>("DELETE", `/v1/kb/sessions/${encodeURIComponent(id)}`);
+  }
+
+  async listKbMessages(id: string, opts: PageOptions = {}): Promise<Page<KbMessage>> {
+    return this.parsed(
+      KbMessageListSchema,
+      "GET",
+      `/v1/kb/sessions/${encodeURIComponent(id)}/messages`,
+      { params: { cursor: opts.cursor, limit: opts.limit } },
+    );
+  }
+
+  async appendKbMessage(
+    id: string,
+    body: { role: string; content: string; metadata?: Record<string, unknown> },
+  ): Promise<KbMessage> {
+    const res = await this.request<{ message: unknown }>(
+      "POST",
+      `/v1/kb/sessions/${encodeURIComponent(id)}/messages`,
+      { body },
+    );
+    return KbMessageSchema.parse(res.message);
+  }
+
+  // ── Ask (POST /v1/ask; response returned as-is; requires an agent API key) ──
+
+  async ask(body: {
+    message: string;
+    session_id?: string;
+    model?: string;
+  }): Promise<unknown> {
+    return this.request("POST", "/v1/ask", { body });
+  }
+
+  // ── Node types (custom node-type registry) ──
+
+  async listNodeTypes(): Promise<Page<NodeType>> {
+    return this.parsed(NodeTypeListSchema, "GET", "/v1/node-types");
+  }
+
+  async registerNodeType(body: CreateNodeTypeRequest): Promise<NodeType> {
+    const res = await this.request<{ node_type: unknown }>("POST", "/v1/node-types", { body });
+    return NodeTypeSchema.parse((res as { node_type?: unknown }).node_type ?? res);
   }
 }
 
