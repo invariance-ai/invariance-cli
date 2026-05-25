@@ -92,12 +92,57 @@ inv doctor
 | `finding list` / `get` / `update` | Investigation records |
 | `review list` / `get` / `claim` / `unclaim` / `resolve` | Resolution workflow |
 | `agent me` / `set-key` | Identity + key registration |
+| `divergence list` / `get` / `update` (alias `divergences`) | Inspect & resolve run-level deviations |
+| `workflow-observability list` / `get` / `executions` (alias `wfobs`) | Per-workflow health rollups & per-execution health |
+| `saved-view list` / `create` / `get` / `update` / `delete` / `run` (alias `saved-views`) | Dashboard queries (full CRUD + run by id or ad-hoc) |
+| `receipt create` / `batch` / `list` / `get` (alias `receipts`) | Ingest/inspect external business-system receipts (write needs agent key) |
+| `node-type list` / `register` (alias `node-types`) | List & register custom node types |
+| `kb page-*` / `session-*` / `messages` / `message-add` | Knowledge-base pages and chat sessions/messages |
+| `ask <question>` | Ask the knowledge agent (needs agent key) |
 | `metrics overview` | Aggregate metrics across runs |
 | `completions <shell>` | Shell completion scripts |
 | `doctor` | Check CLI setup for issues |
 | `version` | Print the CLI version |
 
 All data commands support `--json` for machine-readable output.
+
+> **Auth note:** reads accept an agent **or** operator key. Writes that mutate
+> business facts — `receipt create`/`batch` and `ask` — require an **agent API
+> key** and return a 403 (`AUTH_ERROR`) on operator tokens.
+
+For the full surface-by-surface coverage (TS / Python / CLI / MCP), see
+[`../COVERAGE_MATRIX.md`](../COVERAGE_MATRIX.md).
+
+### Data-plane examples
+
+```bash
+# Workflow health: rollups, then drill into one workflow's executions
+inv workflow-observability list --json
+inv wfobs executions support.escalation --json
+
+# Divergences: list open policy deviations, then accept one
+inv divergence list --status open --kind policy --json
+inv divergence update div_123 --status accepted --json
+
+# Saved views: create, run by id, or run an ad-hoc query
+VIEW=$(inv saved-view create --name "Open escalations" --source executions \
+  --spec '{"aggregation":"count","filters":[{"field":"status","op":"eq","value":"open"}]}' --json | jq -r .id)
+inv saved-view run --id "$VIEW" --json
+inv saved-view run --source runs --spec '{"aggregation":"avg","aggregation_field":"total_cost_usd"}' --json
+
+# Receipts: ingest an external business fact, then list them (agent key required for writes)
+inv receipt create --source stripe --kind refund.created --run-id run_1 \
+  --external-id re_123 --payload '{"amount_usd":42.50}' --json
+inv receipt list --source stripe --json
+
+# Node types: register a custom node type
+inv node-type register --name payment.refund --display-name "Payment Refund" \
+  --custom-fields-schema '{"amount_usd":"number"}' --json
+
+# Knowledge base + ask
+PAGE=$(inv kb page-create --title "Refund SOP" --content "Always confirm approval." --json | jq -r .id)
+inv ask "What is our refund approval policy?" --json
+```
 
 Link a capture to evidence-graph targets:
 

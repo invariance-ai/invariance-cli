@@ -34,6 +34,13 @@ import { evalCommand } from "./commands/eval/index.js";
 import { evalsCommand } from "./commands/evals/index.js";
 import { recordCommand } from "./commands/record/index.js";
 import { cortexCommand } from "./commands/cortex/index.js";
+import { workflowObservabilityCommand } from "./commands/workflow-observability/index.js";
+import { divergenceCommand } from "./commands/divergence/index.js";
+import { savedViewCommand } from "./commands/saved-view/index.js";
+import { receiptCommand } from "./commands/receipt/index.js";
+import { kbCommand } from "./commands/kb/index.js";
+import { askCommand } from "./commands/ask/index.js";
+import { nodeTypeCommand } from "./commands/node-type/index.js";
 import { statusCommand } from "./commands/status.js";
 import { doctorCommand } from "./commands/doctor.js";
 import { completionsCommand } from "./commands/completions.js";
@@ -48,8 +55,9 @@ export function buildProgram(): Command {
       "The Invariance AI command-line interface (`inv`, alias `invariance`).\n\n" +
         "Designed for agents and humans: every read command supports --json and emits\n" +
         "stable IDs so coding/ops agents can chain commands without scraping output.\n\n" +
-        "Covers workflows, cases, events, runs, nodes, monitors, signals, findings, reviews, agents, metrics, eval,\n" +
-        "and stub command groups for graph/recipes/guardrails/evals (backend pending).\n\n" +
+        "Covers workflows, workflow-observability, cases, events, runs, nodes, node-types, monitors, signals,\n" +
+        "findings, reviews, divergences, agents, operators, sessions, captures, receipts, saved-views, kb, ask,\n" +
+        "dna, cortex, metrics, recipes, guardrails, and evals.\n\n" +
         "Get started:\n" +
         "  $ inv login\n" +
         "  $ inv status\n" +
@@ -93,6 +101,11 @@ export function buildProgram(): Command {
   ensureAlias(findingCommand, "findings");
   ensureAlias(reviewCommand, "reviews");
   ensureAlias(captureCommand, "captures");
+  ensureAlias(workflowObservabilityCommand, "wfobs");
+  ensureAlias(divergenceCommand, "divergences");
+  ensureAlias(savedViewCommand, "saved-views");
+  ensureAlias(receiptCommand, "receipts");
+  ensureAlias(nodeTypeCommand, "node-types");
 
   program.addCommand(caseCommand);
   program.addCommand(workflowCommand);
@@ -117,6 +130,13 @@ export function buildProgram(): Command {
   program.addCommand(evalsCommand);
   program.addCommand(recordCommand);
   program.addCommand(cortexCommand);
+  program.addCommand(workflowObservabilityCommand);
+  program.addCommand(divergenceCommand);
+  program.addCommand(savedViewCommand);
+  program.addCommand(receiptCommand);
+  program.addCommand(kbCommand);
+  program.addCommand(askCommand);
+  program.addCommand(nodeTypeCommand);
   program.addCommand(statusCommand);
 
   // Top-level ergonomics: `invariance login` / `invariance logout` mirror
