@@ -154,6 +154,7 @@ export const WorkflowEventSchema = z.object({
   evidence_node_ids: z.array(z.string()),
   evidence_refs: z.array(WorkflowEvidenceRefSchema),
   idempotency_key: z.string().nullable().optional(),
+  tags: z.array(z.string()).nullable().optional(),
   occurred_at: z.string(),
   created_at: z.string(),
 });
@@ -191,6 +192,9 @@ export type WorkflowDefinitionStep = z.infer<typeof WorkflowDefinitionStepSchema
 export const WorkflowOutcomeKindSchema = z.enum(["success", "failure", "neutral"]);
 export type WorkflowOutcomeKind = z.infer<typeof WorkflowOutcomeKindSchema>;
 
+export const WorkflowSpecLevelSchema = z.enum(["minimal", "steps_only", "full"]);
+export type WorkflowSpecLevel = z.infer<typeof WorkflowSpecLevelSchema>;
+
 export const WorkflowDefinitionOutcomeSchema = z.object({
   value: z.string(),
   label: z.string().optional(),
@@ -214,6 +218,8 @@ export const WorkflowDefinitionSchema = z.object({
   expected_steps: z.array(WorkflowDefinitionStepSchema),
   allowed_outcomes: z.array(WorkflowDefinitionOutcomeSchema),
   custom_metrics: z.array(WorkflowMetricWidgetSchema),
+  stale_after_hours: z.number().optional(),
+  spec_level: WorkflowSpecLevelSchema.optional(),
   created_at: z.string(),
   updated_at: z.string(),
 });
