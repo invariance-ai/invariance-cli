@@ -10,9 +10,69 @@
  * dep (or a generated fixture committed to this repo).
  */
 import { describe, expect, it } from 'vitest';
-import { WorkflowEventSchema } from '../types/index.js';
+import { WorkflowEventSchema, WorkflowDefinitionSchema } from '../types/index.js';
 
 describe('api-types contract: CLI Zod schemas', () => {
+  // Field-set tripwires: Zod `.object()` strips unknown keys on parse, so a
+  // server field the schema forgets is silently dropped. Pin the expected key
+  // sets (mirrored from @invariance/api-types) so additions/removals fail here.
+  it('WorkflowEvent schema declares exactly the server response fields', () => {
+    expect(Object.keys(WorkflowEventSchema.shape).sort()).toEqual([
+      'actor_id',
+      'actor_type',
+      'agent_id',
+      'case_id',
+      'created_at',
+      'end_user_id',
+      'evidence_node_ids',
+      'evidence_refs',
+      'id',
+      'idempotency_key',
+      'occurred_at',
+      'payload',
+      'tags',
+      'tenant_id',
+      'type',
+    ]);
+  });
+
+  it('WorkflowDefinition schema declares exactly the server response fields', () => {
+    expect(Object.keys(WorkflowDefinitionSchema.shape).sort()).toEqual([
+      'agent_id',
+      'allowed_outcomes',
+      'created_at',
+      'custom_metrics',
+      'description',
+      'display_name',
+      'expected_fields',
+      'expected_steps',
+      'key',
+      'spec_level',
+      'stale_after_hours',
+      'updated_at',
+    ]);
+  });
+
+  it('WorkflowEvent fixture parses with tags', () => {
+    const fixture = {
+      id: 'workflow_event_3',
+      case_id: 'case_1',
+      agent_id: 'agt_1',
+      tenant_id: null,
+      end_user_id: null,
+      type: 'support.escalated',
+      actor_type: null,
+      actor_id: null,
+      payload: {},
+      evidence_node_ids: [],
+      evidence_refs: [],
+      tags: ['vip', 'urgent'],
+      occurred_at: '2026-05-21T10:00:00.000Z',
+      created_at: '2026-05-21T10:00:01.000Z',
+    };
+    expect(WorkflowEventSchema.parse(fixture).tags).toEqual(['vip', 'urgent']);
+  });
+
   it('WorkflowEvent fixture parses with idempotency_key present', () => {
     const fixture = {
       id: 'workflow_event_1',
