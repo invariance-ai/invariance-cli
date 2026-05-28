@@ -395,7 +395,7 @@ describe("command wiring", () => {
     writeSpy.mockRestore();
   });
 
-  it("run inspect returns composite shape {run, metrics, narrative, recent_nodes, open_findings}", async () => {
+  it("run inspect returns composite shape with observability summary", async () => {
     process.env.INVARIANCE_API_KEY = "inv_test_key";
     process.env.INVARIANCE_BASE_URL = "https://api.test";
 
@@ -430,11 +430,11 @@ describe("command wiring", () => {
       agent_id: "agent_1",
       parent_id: null,
       action_type: "tool_call",
-      type: null,
+      type: "tool_call",
       input: {},
       output: {},
       error: null,
-      metadata: {},
+      metadata: { tool_name: "stripe.refunds.create" },
       custom_fields: {},
       timestamp: 1,
       duration_ms: null,
@@ -509,12 +509,20 @@ describe("command wiring", () => {
       run: unknown;
       metrics: unknown;
       narrative: unknown;
+      observability: {
+        step_count: number;
+        tool_call_count: number;
+        steps: Array<{ node_id: string; kind: string }>;
+      };
       recent_nodes: { id: string }[];
       open_findings: { id: string; run_id: string; status: string }[];
     };
     expect(Object.keys(result).sort()).toEqual(
-      ["metrics", "narrative", "open_findings", "recent_nodes", "run"].sort(),
+      ["metrics", "narrative", "observability", "open_findings", "recent_nodes", "run"].sort(),
     );
+    expect(result.observability.step_count).toBe(1);
+    expect(result.observability.tool_call_count).toBe(1);
+    expect(result.observability.steps[0]).toMatchObject({ node_id: "node_1", kind: "tool" });
     expect(result.recent_nodes).toHaveLength(1);
     expect(result.open_findings).toHaveLength(1);
     expect(result.open_findings[0]?.id).toBe("f_1");

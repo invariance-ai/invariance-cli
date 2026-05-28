@@ -5,7 +5,7 @@ import { action, parseIntFlag, parseJsonFlag, printPage, printValue } from "../.
 import { paginate } from "../../lib/paginate.js";
 import { resolveRunId } from "../../lib/runs.js";
 import { dashboardBaseUrl } from "../auth/login.js";
-import type { Finding } from "../../types/index.js";
+import type { Finding, Node } from "../../types/index.js";
 
 const RUN_COLUMNS = [
   { key: "id", label: "ID", width: 26 },
@@ -23,6 +23,84 @@ const NODE_COLUMNS = [
 
 const LATEST_HELP =
   "Run id; pass `latest` to resolve to the most recently created run for the current agent.";
+
+interface StepObservability {
+  node_id: string;
+  action_type: string;
+  type: string | null;
+  kind: "llm" | "tool" | "message" | "step";
+  status: "ok" | "error";
+  input_tokens: number;
+  output_tokens: number;
+  cache_read_tokens: number;
+  cache_write_tokens: number;
+  words_created: number;
+  duration_ms: number | null;
+}
+
+function summarizeRunObservability(runId: string, nodes: Node[]) {
+  const steps = nodes.map(stepObservabilityForNode);
+  const sum = (key: keyof StepObservability) =>
+    steps.reduce((acc, step) => {
+      const value = step[key];
+      return acc + (typeof value === "number" ? value : 0);
+    }, 0);
+  return {
+    run_id: runId,
+    step_count: nodes.length,
+    llm_call_count: steps.filter((s) => s.kind === "llm").length,
+    tool_call_count: steps.filter((s) => s.kind === "tool").length,
+    error_count: steps.filter((s) => s.status === "error").length,
+    total_input_tokens: sum("input_tokens"),
+    total_output_tokens: sum("output_tokens"),
+    total_cache_read_tokens: sum("cache_read_tokens"),
+    total_cache_write_tokens: sum("cache_write_tokens"),
+    total_words_created: sum("words_created"),
+    total_duration_ms: sum("duration_ms"),
+    steps,
+  };
+}
+
+function stepObservabilityForNode(node: Node): StepObservability {
+  const llm = readObject(node.metadata.llm);
+  const output = readObject(node.output);
+  return {
+    node_id: node.id,
+    action_type: node.action_type,
+    type: node.type,
+    kind: kindForNode(node),
+    status: node.error == null ? "ok" : "error",
+    input_tokens: readNumber(llm.input_tokens),
+    output_tokens: readNumber(llm.output_tokens),
+    cache_read_tokens: readNumber(llm.cache_read_tokens),
+    cache_write_tokens: readNumber(llm.cache_write_tokens),
+    words_created:
+      readNumber(node.metadata.words_created) ||
+      readNumber(output.words_created) ||
+      countWords(typeof output.text === "string" ? output.text : null),
+    duration_ms: node.duration_ms,
+  };
+}
+
+function kindForNode(node: Node): StepObservability["kind"] {
+  if (node.type === "llm_call" || node.action_type.startsWith("llm.")) return "llm";
+  if (node.type === "tool_call" || node.metadata.tool_name != null) return "tool";
+  if (node.type === "message" || node.action_type.includes("message") || node.action_type.includes("prompt")) return "message";
+  return "step";
+}
+
+function readObject(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" ? value as Record<string, unknown> : {};
+}
+
+function readNumber(value: unknown): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
+function countWords(text: string | null): number {
+  if (!text) return 0;
+  return text.trim().split(/\s+/).filter(Boolean).length;
+}
 
 export const runCommand = new Command("run").description("Inspect and manage runs as execution evidence attached to cases/workflows");
 
@@ -274,7 +352,7 @@ runCommand.addCommand(
   action(
     new Command("inspect")
       .description(
-        "Composite triage view for a run: returns {run, metrics, narrative, recent_nodes, open_findings} as JSON.",
+        "Composite triage view for a run: returns {run, metrics, narrative, observability, recent_nodes, open_findings} as JSON.",
       )
       .argument("<id>", LATEST_HELP)
       .option(
@@ -302,12 +380,14 @@ runCommand.addCommand(
       const open_findings = (findingsPage.data as Finding[]).filter(
         (f) => f.run_id === id && f.status === "open",
       );
+      const recent_nodes = nodesPage.data as Node[];
 
       const result = {
         run,
         metrics,
         narrative,
-        recent_nodes: nodesPage.data,
+        observability: summarizeRunObservability(id, recent_nodes),
+        recent_nodes,
         open_findings,
       };
 
