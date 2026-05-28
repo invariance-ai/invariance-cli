@@ -251,3 +251,142 @@ monitorCommand.addCommand(
     },
   ) as Command,
 );
+
+// ── Preview (read-only dry-runs; never write signals/findings/reviews) ──
+
+monitorCommand.addCommand(
+  action(
+    new Command("preview-target")
+      .description(
+        "Dry-run a monitor target against history. Output (--json): {run_ids, node_ids, counts: {runs, nodes}, truncated}. Provide --file/--spec with a {target} or {monitor_id} body. Writes nothing.",
+      )
+      .option("--file <path>", "JSON file with {target?|monitor_id?, sample_limit?}")
+      .option("--spec <json>", "Inline JSON body")
+      .option("--sample-limit <n>", "Max nodes to sample", parseIntFlag)
+      .addHelpText(
+        "after",
+        "\nExample:\n  $ invariance monitor preview-target --spec '{\"target\":{\"kind\":\"current_run\"}}' --json\n",
+      ),
+    async ({ client, globals, opts }) => {
+      const body = await readBody(opts);
+      if (opts.sampleLimit !== undefined) body.sample_limit = opts.sampleLimit;
+      printValue(await client.previewMonitorTarget(body), globals);
+    },
+  ) as Command,
+);
+
+monitorCommand.addCommand(
+  action(
+    new Command("preview-evaluator")
+      .description(
+        "Dry-run a monitor evaluator against history. Output (--json): {sampled, matched, matches: [{run_id, node_id, matched, reason, observed_value?}]}. Provide --file/--spec with {evaluator, target?}. Writes nothing.",
+      )
+      .option("--file <path>", "JSON file with {evaluator, target?, sample_limit?}")
+      .option("--spec <json>", "Inline JSON body")
+      .option("--sample-limit <n>", "Max nodes to sample", parseIntFlag)
+      .addHelpText(
+        "after",
+        "\nExample:\n  $ invariance monitor preview-evaluator --spec '{\"evaluator\":{\"type\":\"keyword\",\"field\":\"output\",\"keywords\":[\"error\"]}}' --json\n",
+      ),
+    async ({ client, globals, opts }) => {
+      const body = await readBody(opts);
+      if (opts.sampleLimit !== undefined) body.sample_limit = opts.sampleLimit;
+      printValue(await client.previewMonitorEvaluator(body), globals);
+    },
+  ) as Command,
+);
+
+// ── Routes (delivery: webhook / slack_webhook) ──
+
+const routeCommand = new Command("route").description(
+  "Manage monitor delivery routes (webhook / slack_webhook)",
+);
+
+routeCommand.addCommand(
+  action(
+    new Command("create")
+      .description(
+        "Create a delivery route. Provide --file/--spec with {target_type: 'webhook'|'slack_webhook', config: {url, headers?, secret?}, events: [...], monitor_id?, enabled?}.",
+      )
+      .option("--file <path>", "JSON file with CreateMonitorRouteRequest body")
+      .option("--spec <json>", "Inline JSON body")
+      .addHelpText(
+        "after",
+        "\nExample:\n  $ invariance monitor route create --spec '{\"target_type\":\"slack_webhook\",\"config\":{\"url\":\"https://hooks.slack.com/...\"},\"events\":[\"finding.created\"]}' --json\n",
+      ),
+    async ({ client, globals, opts }) => {
+      const body = await readBody(opts);
+      printValue(await client.createMonitorRoute(body), globals);
+    },
+  ) as Command,
+);
+
+routeCommand.addCommand(
+  action(
+    new Command("list")
+      .description("List delivery routes. Output (--json): {data: MonitorRoute[], next_cursor}.")
+      .option("--monitor-id <id>", "Filter to routes for a specific monitor")
+      .option("--limit <n>", "Page size", parseIntFlag)
+      .option("--cursor <c>", "opaque pagination token"),
+    async ({ client, globals, opts }) => {
+      printValue(
+        await client.listMonitorRoutes({
+          cursor: opts.cursor,
+          limit: opts.limit,
+          monitor_id: opts.monitorId,
+        }),
+        globals,
+      );
+    },
+  ) as Command,
+);
+
+routeCommand.addCommand(
+  action(
+    new Command("update")
+      .description("Update a delivery route. Provide --file/--spec with the patch body.")
+      .argument("<id>")
+      .option("--file <path>", "JSON file with UpdateMonitorRouteRequest body")
+      .option("--spec <json>", "Inline JSON body"),
+    async ({ client, globals, opts, cmd }) => {
+      const body = await readBody(opts);
+      printValue(await client.updateMonitorRoute(cmd.args[0]!, body), globals);
+    },
+  ) as Command,
+);
+
+routeCommand.addCommand(
+  action(
+    new Command("delete")
+      .description("Delete a delivery route.")
+      .argument("<id>")
+      .option("-y, --yes", "Skip confirmation prompt"),
+    async ({ client, globals, opts, cmd }) => {
+      const id = cmd.args[0]!;
+      if (!opts.yes) {
+        const ok = await confirm(`Delete monitor route ${id}? [y/N] `);
+        if (!ok) {
+          if (!globals.json) process.stderr.write("Cancelled.\n");
+          return;
+        }
+      }
+      await client.deleteMonitorRoute(id);
+      printValue({ id, deleted: true }, globals);
+    },
+  ) as Command,
+);
+
+routeCommand.addCommand(
+  action(
+    new Command("test")
+      .description(
+        "Send a synthetic payload through a route to verify delivery. Output (--json): {attempts: [...]}.",
+      )
+      .argument("<id>"),
+    async ({ client, globals, cmd }) => {
+      printValue(await client.testMonitorRoute(cmd.args[0]!), globals);
+    },
+  ) as Command,
+);
+
+monitorCommand.addCommand(routeCommand);
