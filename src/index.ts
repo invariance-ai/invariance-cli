@@ -31,7 +31,6 @@ import { graphCommand } from "./commands/graph/index.js";
 import { recipesCommand } from "./commands/recipes/index.js";
 import { guardrailsCommand } from "./commands/guardrails/index.js";
 import { evalCommand } from "./commands/eval/index.js";
-import { evalsCommand } from "./commands/evals/index.js";
 import { recordCommand } from "./commands/record/index.js";
 import { cortexCommand } from "./commands/cortex/index.js";
 import { workflowObservabilityCommand } from "./commands/workflow-observability/index.js";
@@ -127,7 +126,6 @@ export function buildProgram(): Command {
   program.addCommand(recipesCommand);
   program.addCommand(guardrailsCommand);
   program.addCommand(evalCommand);
-  program.addCommand(evalsCommand);
   program.addCommand(recordCommand);
   program.addCommand(cortexCommand);
   program.addCommand(workflowObservabilityCommand);

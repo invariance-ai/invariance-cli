@@ -51,6 +51,8 @@ import {
   type ScorerSpec,
   type EvalRunRecord,
   type EvalResultRecord,
+  type EvalSuiteRecord,
+  type EvalCaseRecord,
   type CompareResponse,
   RecipeSchema,
   RecipeListSchema,
@@ -908,6 +910,41 @@ export class InvarianceClient {
     return this.request<Page<EvalScorer>>("GET", "/v1/eval-scorers", {
       params: { cursor: opts.cursor, limit: opts.limit },
     });
+  }
+
+  // ── Evals: suites & cases ──
+
+  async createEvalSuite(input: {
+    name: string;
+    description?: string;
+    target_type?: string;
+    metadata?: Record<string, unknown>;
+  }): Promise<EvalSuiteRecord> {
+    const res = await this.request<{ suite: EvalSuiteRecord }>("POST", "/v1/eval-suites", {
+      body: { target_type: "run", ...input },
+    });
+    return res.suite;
+  }
+
+  async createEvalCaseFromRun(
+    suiteId: string,
+    input: {
+      source_run_id: string;
+      source_finding_id?: string;
+      source_signal_id?: string;
+      name?: string;
+      expected?: Record<string, unknown>;
+      assertions?: unknown[];
+      mutations?: unknown[];
+      metadata?: Record<string, unknown>;
+    },
+  ): Promise<EvalCaseRecord> {
+    const res = await this.request<{ case: EvalCaseRecord }>(
+      "POST",
+      `/v1/eval-suites/${encodeURIComponent(suiteId)}/cases/from-run`,
+      { body: input },
+    );
+    return res.case;
   }
 
   // ── Evals: experiment / compare ──

@@ -265,4 +265,52 @@ describe("auth helpers", () => {
     const init = fetchSpy.mock.calls[0]![1] as RequestInit;
     expect(JSON.parse(init.body as string)).toEqual({ refresh_token: "old_refresh" });
   });
+
+  // PR4 — production-run → eval-case client methods.
+  it("createEvalSuite posts to /v1/eval-suites with a default target_type", async () => {
+    fetchSpy.mockResolvedValueOnce(jsonResponse({ suite: { id: "es_1", name: "demo" } }));
+    const c = new InvarianceClient({ apiKey: "k", baseUrl: BASE });
+    const suite = await c.createEvalSuite({ name: "demo" });
+    expect(suite).toMatchObject({ id: "es_1" });
+    const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`${BASE}/v1/eval-suites`);
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(init.body as string)).toMatchObject({ name: "demo", target_type: "run" });
+  });
+
+  it("createEvalCaseFromRun posts run + signal provenance to the from-run route", async () => {
+    fetchSpy.mockResolvedValueOnce(jsonResponse({ case: { id: "ec_1", source_signal_id: "sig_1" } }));
+    const c = new InvarianceClient({ apiKey: "k", baseUrl: BASE });
+    const created = await c.createEvalCaseFromRun("es_1", {
+      source_run_id: "run_1",
+      source_signal_id: "sig_1",
+    });
+    expect(created).toMatchObject({ id: "ec_1", source_signal_id: "sig_1" });
+    const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`${BASE}/v1/eval-suites/es_1/cases/from-run`);
+    expect(JSON.parse(init.body as string)).toMatchObject({
+      source_run_id: "run_1",
+      source_signal_id: "sig_1",
+    });
+  });
+
+  it("runEvalSuite returns the inline failures + results_url the API supplies", async () => {
+    fetchSpy.mockResolvedValueOnce(
+      jsonResponse({
+        eval_run: {
+          id: "erun_1",
+          status: "failed",
+          summary: { case_count: 1, passed: 0, failed: 1, errored: 0 },
+          failures: [{ case_id: "ec_1", message: "expected entity not found", path: "entities" }],
+          results_url: "https://app.test/evals?run=erun_1",
+        },
+      }),
+    );
+    const c = new InvarianceClient({ apiKey: "k", baseUrl: BASE });
+    const run = await c.runEvalSuite("es_1");
+    expect(run.status).toBe("failed");
+    expect(run.failures).toHaveLength(1);
+    expect(run.failures?.[0]).toMatchObject({ case_id: "ec_1", path: "entities" });
+    expect(run.results_url).toContain("/evals?run=");
+  });
 });
