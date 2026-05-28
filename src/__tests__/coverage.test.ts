@@ -32,7 +32,6 @@ const IN_SCOPE_GROUPS = [
   "finding",
   "review",
   "eval",
-  "evals",
   "guardrails",
   "recipes",
   "kb",

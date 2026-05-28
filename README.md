@@ -45,6 +45,18 @@ inv case close "$CASE" --outcome resolved --value-usd 250 --json
 # Inspect a finished run end-to-end (run + nodes in one JSON blob)
 inv run inspect "$RUN" --json
 
+# Workflow health, dashboard views, and Cortex
+inv workflow-observability executions support.escalation --json
+VIEW=$(inv saved-view create --name "Task usage by action" --source nodes --viz bar \
+  --spec '{"group_by":"action_type","aggregation":"count","filters":[{"field":"workflow_key","op":"eq","value":"support.escalation"}]}' \
+  --json | jq -r .id)
+inv saved-view run --id "$VIEW" --json
+inv cortex ask "What should the support escalation dashboard show?" \
+  --project "$INVARIANCE_PROJECT_ID" \
+  --target-type workflow \
+  --target-ref support.escalation \
+  --json
+
 # Stream nodes, or fetch one page for scripts/smoke tests
 inv node tail "$RUN"
 inv node tail "$RUN" --once --json
@@ -60,9 +72,15 @@ inv monitor list
 inv signals list
 inv reviews list
 
+# Production run -> eval case -> suite run -> regression compare
+inv eval suite create --name regressions --json
+inv eval case create-from-run --suite "$SUITE" --run "$RUN" --signal "$SIGNAL" --json
+inv eval suite run "$SUITE" --json        # prints {failures, results_url}
+inv eval run results "$EVAL_RUN" --json
+inv eval compare "$CANDIDATE" "$BASELINE" --json
+
 # Stub commands (backend pending — emit structured API_NOT_AVAILABLE errors)
 inv graph get "$RUN" --json
-inv evals create-case --from-run "$RUN" --suite regressions --json
 inv guardrails list --json
 
 # Check your setup
@@ -95,6 +113,7 @@ inv doctor
 | `divergence list` / `get` / `update` (alias `divergences`) | Inspect & resolve run-level deviations |
 | `workflow-observability list` / `get` / `executions` (alias `wfobs`) | Per-workflow health rollups & per-execution health |
 | `saved-view list` / `create` / `get` / `update` / `delete` / `run` (alias `saved-views`) | Dashboard queries (full CRUD + run by id or ad-hoc) |
+| `cortex ask` / `launch` / `list` / `retry` / `runs` | Governed analyst questions, jobs, queue inspection, and attempt history |
 | `receipt create` / `batch` / `list` / `get` (alias `receipts`) | Ingest/inspect external business-system receipts (write needs agent key) |
 | `node-type list` / `register` (alias `node-types`) | List & register custom node types |
 | `kb page-*` / `session-*` / `messages` / `message-add` | Knowledge-base pages and chat sessions/messages |
@@ -129,6 +148,15 @@ VIEW=$(inv saved-view create --name "Open escalations" --source executions \
   --spec '{"aggregation":"count","filters":[{"field":"status","op":"eq","value":"open"}]}' --json | jq -r .id)
 inv saved-view run --id "$VIEW" --json
 inv saved-view run --source runs --spec '{"aggregation":"avg","aggregation_field":"total_cost_usd"}' --json
+
+# Cortex: ask a cited operational question or queue a deeper job
+inv cortex ask "Which open escalations need review, and why?" \
+  --project "$INVARIANCE_PROJECT_ID" \
+  --target-type workflow \
+  --target-ref support.escalation \
+  --json
+inv cortex launch --project "$INVARIANCE_PROJECT_ID" --kind divergence_error_tracking \
+  --target-type workflow --target-ref support.escalation --mode async --json
 
 # Receipts: ingest an external business fact, then list them (agent key required for writes)
 inv receipt create --source stripe --kind refund.created --run-id run_1 \
@@ -167,6 +195,8 @@ inv node tail <run_id> --json     # streaming trace events as JSON lines
 ```
 
 Every command emits stable IDs and structured errors, so chained calls (`jq`, scripts, agents) don't have to scrape human output. When something fails, an agent can fetch the failing run with `inv run inspect`, locate the failing node, and report or replay it.
+
+For launch-ready observability, make this the default agent template: run `inv doctor --json`, create or reuse a case, start a run, write one node per LLM call/tool call/retrieval/decision/handoff/error, emit semantic workflow events, finish or fail the run, then check workflow observability, saved views, open findings, and Cortex suggestions. When Cortex suggests dashboard panels, inspect the SQL-like structured query shape before saving the view.
 
 See [`AGENTS.md`](AGENTS.md) for the agent-friendly command reference.
 

@@ -549,6 +549,37 @@ export interface EvalRunRecord {
   completed_at: string | null;
   created_at: string;
   updated_at: string;
+  /** Populated by POST /v1/eval-suites/:id/run. Flattened per-case failures. */
+  failures?: Array<{ case_id: string; message: string; path?: string }>;
+  /** Populated by POST /v1/eval-suites/:id/run when WEBSITE_ORIGIN is configured. */
+  results_url?: string;
+}
+
+export interface EvalSuiteRecord {
+  id: string;
+  agent_id: string;
+  name: string;
+  description: string;
+  target_type: string;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EvalCaseRecord {
+  id: string;
+  suite_id: string;
+  agent_id: string;
+  source_run_id: string | null;
+  source_finding_id: string | null;
+  source_signal_id: string | null;
+  source_graph_ref: string | null;
+  name: string;
+  input_bundle: Record<string, unknown>;
+  expected: Record<string, unknown>;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface EvalResultRecord {

@@ -8,6 +8,9 @@ import { datasetCommand } from "./dataset.js";
 import { scorerCommand } from "./scorer.js";
 import { experimentCommand } from "./experiment.js";
 import { compareCommand } from "./compare.js";
+import { suiteCommand } from "./suite.js";
+import { caseCommand } from "./case.js";
+import { runCommand } from "./run.js";
 
 const FAIL_SEVERITIES = new Set<Finding["severity"]>(["medium", "high", "critical"]);
 
@@ -100,9 +103,10 @@ export const evalCommand = new Command("eval").description(
 
 evalCommand.addCommand(
   action(
-    new Command("run")
+    new Command("run-spec")
       .description(
-        "Execute every case in a spec file as Invariance runs. " +
+        "Legacy: execute every case in a spec file as metadata-tagged Invariance runs. " +
+          "For the suite API use `inv eval suite run`. " +
           "Output (--json): {suite, total, passed, failed, results: EvalRunResult[]}",
       )
       .argument("<spec>", "Path to JSON spec: {suite, cases:[{name, input?, expected?, monitors?:string[]}], monitors?:string[]}")
@@ -206,6 +210,9 @@ evalCommand.addCommand(
   ) as Command,
 );
 
+evalCommand.addCommand(suiteCommand);
+evalCommand.addCommand(caseCommand);
+evalCommand.addCommand(runCommand);
 evalCommand.addCommand(datasetCommand);
 evalCommand.addCommand(scorerCommand);
 evalCommand.addCommand(experimentCommand);
