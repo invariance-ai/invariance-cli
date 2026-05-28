@@ -683,6 +683,44 @@ export class InvarianceClient {
     );
   }
 
+  async previewMonitorTarget(body: Record<string, unknown>): Promise<unknown> {
+    return this.request("POST", "/v1/monitors/preview-target", { body });
+  }
+
+  async previewMonitorEvaluator(body: Record<string, unknown>): Promise<unknown> {
+    return this.request("POST", "/v1/monitors/preview-evaluator", { body });
+  }
+
+  // ── Monitor routes ──
+
+  async createMonitorRoute(body: Record<string, unknown>): Promise<unknown> {
+    const res = await this.request<{ route: unknown }>("POST", "/v1/monitor-routes", { body });
+    return res.route;
+  }
+
+  async listMonitorRoutes(opts: { cursor?: string; limit?: number; monitor_id?: string } = {}): Promise<unknown> {
+    return this.request("GET", "/v1/monitor-routes", {
+      params: { cursor: opts.cursor, limit: opts.limit, monitor_id: opts.monitor_id },
+    });
+  }
+
+  async updateMonitorRoute(id: string, patch: Record<string, unknown>): Promise<unknown> {
+    const res = await this.request<{ route: unknown }>(
+      "PATCH",
+      `/v1/monitor-routes/${encodeURIComponent(id)}`,
+      { body: patch },
+    );
+    return res.route;
+  }
+
+  async deleteMonitorRoute(id: string): Promise<void> {
+    await this.request<void>("DELETE", `/v1/monitor-routes/${encodeURIComponent(id)}`);
+  }
+
+  async testMonitorRoute(id: string): Promise<unknown> {
+    return this.request("POST", `/v1/monitor-routes/${encodeURIComponent(id)}/test`, { body: {} });
+  }
+
   // ── Signals ──
 
   async emitSignal(input: {
