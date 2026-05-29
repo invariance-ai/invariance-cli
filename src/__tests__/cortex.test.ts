@@ -281,6 +281,99 @@ describe("cortex CLI commands", () => {
     });
   });
 
+  it("`cortex counterfactual launch` uses the governed launcher in sync mode by default", async () => {
+    process.env.INVARIANCE_API_KEY = "inv_test_key";
+    process.env.INVARIANCE_BASE_URL = BASE;
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      jsonResponse({
+        job_id: "ctxjob_88",
+        status: "succeeded",
+        mode: "sync",
+        deduplicated: false,
+        result: {
+          kind: "counterfactual_eval",
+          answer: "Approval likely would have delayed the refund.",
+          confidence: 0.7,
+          assumptions: ["Manager approval was available."],
+          uncertainty: "Moderate.",
+        },
+      }),
+    );
+
+    await runCli([
+      "--json",
+      "cortex",
+      "counterfactual",
+      "launch",
+      "--target",
+      "run:run_123",
+      "--question",
+      "What if the refund policy required manager approval?",
+      "--project-id",
+      "proj_123",
+      "--idempotency-key",
+      "cf-run-123-manager-approval",
+    ]);
+
+    expect(String(fetchSpy.mock.calls[0]![0])).toBe(`${BASE}/v1/cortex/jobs/launch`);
+    const init = fetchSpy.mock.calls[0]![1] as RequestInit;
+    expect(JSON.parse(init.body as string)).toMatchObject({
+      job_kind: "counterfactual_eval",
+      project_id: "proj_123",
+      target_type: "run",
+      target_ref: "run_123",
+      question: "What if the refund policy required manager approval?",
+      mode: "sync",
+      idempotency_key: "cf-run-123-manager-approval",
+    });
+  });
+
+  it("`cortex counterfactual list` filters Cortex jobs to counterfactual_eval", async () => {
+    process.env.INVARIANCE_API_KEY = "inv_test_key";
+    process.env.INVARIANCE_BASE_URL = BASE;
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      jsonResponse({ data: [], next_cursor: null }),
+    );
+
+    await runCli([
+      "--json",
+      "cortex",
+      "counterfactual",
+      "list",
+      "--status",
+      "succeeded",
+      "--limit",
+      "10",
+    ]);
+
+    expect(String(fetchSpy.mock.calls[0]![0])).toBe(
+      `${BASE}/v1/cortex/jobs?limit=10&status=succeeded&kind=counterfactual_eval`,
+    );
+  });
+
+  it("`cortex counterfactual result` GETs the structured job result", async () => {
+    process.env.INVARIANCE_API_KEY = "inv_test_key";
+    process.env.INVARIANCE_BASE_URL = BASE;
+    const body = {
+      job_id: "ctxjob_88",
+      status: "succeeded",
+      result: {
+        kind: "counterfactual_eval",
+        answer: "Approval likely would have delayed the refund.",
+        confidence: 0.7,
+        assumptions: ["Manager approval was available."],
+        uncertainty: "Moderate.",
+      },
+    };
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(jsonResponse(body));
+    const out = await runCli(["--json", "cortex", "counterfactual", "result", "ctxjob_88"]);
+
+    expect(String(fetchSpy.mock.calls[0]![0])).toBe(
+      `${BASE}/v1/cortex/jobs/ctxjob_88/result`,
+    );
+    expect(JSON.parse(out.trimEnd())).toEqual(body);
+  });
+
   it("`cortex job get` GETs /v1/cortex/jobs/:id", async () => {
     process.env.INVARIANCE_API_KEY = "inv_test_key";
     process.env.INVARIANCE_BASE_URL = BASE;

@@ -40,6 +40,7 @@ import { receiptCommand } from "./commands/receipt/index.js";
 import { kbCommand } from "./commands/kb/index.js";
 import { askCommand } from "./commands/ask/index.js";
 import { nodeTypeCommand } from "./commands/node-type/index.js";
+import { setupCommand } from "./commands/setup/index.js";
 import { statusCommand } from "./commands/status.js";
 import { doctorCommand } from "./commands/doctor.js";
 import { completionsCommand } from "./commands/completions.js";
@@ -59,6 +60,7 @@ export function buildProgram(): Command {
         "dna, cortex, metrics, recipes, guardrails, and evals.\n\n" +
         "Get started:\n" +
         "  $ inv login\n" +
+        "  $ inv setup agent\n" +
         "  $ inv status\n" +
         "  $ inv case list --json\n" +
         "  $ inv run start --name triage --case-id case_abc --json",
@@ -135,6 +137,7 @@ export function buildProgram(): Command {
   program.addCommand(kbCommand);
   program.addCommand(askCommand);
   program.addCommand(nodeTypeCommand);
+  program.addCommand(setupCommand);
   program.addCommand(statusCommand);
 
   // Top-level ergonomics: `invariance login` / `invariance logout` mirror

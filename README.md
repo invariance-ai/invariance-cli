@@ -34,6 +34,9 @@ inv login --api-key inv_live_...
 # Confirm identity + connectivity (agent-friendly, --json-clean)
 inv status --json
 
+# Print ready-to-use Claude Code / Codex MCP config, env, and smoke-test commands
+inv setup agent --json
+
 # Create a case for one workflow instance, then attach a run as evidence
 CASE=$(inv case create --workflow-key support.escalation --tenant-id acme --end-user-id cus_123 --json | jq -r .id)
 RUN=$(inv run start --name triage --case-id "$CASE" --json | jq -r .id)
@@ -79,6 +82,15 @@ inv eval suite run "$SUITE" --json        # prints {failures, results_url}
 inv eval run results "$EVAL_RUN" --json
 inv eval compare "$CANDIDATE" "$BASELINE" --json
 
+# JSONL dataset -> dataset + suite + cases + optional run in one command
+inv eval dataset seed-suite --name refund-regression --file cases.jsonl --run --json
+
+# Counterfactuals over observed runs/cases
+inv cortex counterfactual launch --project-id "$PROJECT" --target run:"$RUN" \
+  --question "What if manager approval had been required?" --json
+inv cortex counterfactual list --status succeeded --json
+inv cortex counterfactual result "$JOB" --json
+
 # Stub commands (backend pending — emit structured API_NOT_AVAILABLE errors)
 inv graph get "$RUN" --json
 inv guardrails list --json
@@ -94,6 +106,7 @@ inv doctor
 | `login` / `auth login` | Authenticate with the Invariance API (browser or paste key) |
 | `logout` / `auth logout` | Clear stored credentials |
 | `auth whoami` | Display the current user |
+| `setup agent` | Validate the API key and print agent-ready env, MCP config, smoke-run, eval, and counterfactual commands |
 | `config get <key>` / `set` | Read/write a config value |
 | `case create` / `list` / `get` / `close` | Manage workflow instances and outcomes |
 | `run start` / `list` / `get <id>` | Start, list, inspect execution evidence |
@@ -112,8 +125,10 @@ inv doctor
 | `agent me` / `set-key` | Identity + key registration |
 | `divergence list` / `get` / `update` (alias `divergences`) | Inspect & resolve run-level deviations |
 | `workflow-observability list` / `get` / `executions` (alias `wfobs`) | Per-workflow health rollups & per-execution health |
+| `eval dataset seed-suite` | Create a dataset, linked suite, cases, and optional eval run from JSONL |
 | `saved-view list` / `create` / `get` / `update` / `delete` / `run` (alias `saved-views`) | Dashboard queries (full CRUD + run by id or ad-hoc) |
 | `cortex ask` / `launch` / `list` / `retry` / `runs` | Governed analyst questions, jobs, queue inspection, and attempt history |
+| `cortex counterfactual launch` / `list` / `result` | Counterfactual evals over observed runs/cases without remembering job-kind strings |
 | `receipt create` / `batch` / `list` / `get` (alias `receipts`) | Ingest/inspect external business-system receipts (write needs agent key) |
 | `node-type list` / `register` (alias `node-types`) | List & register custom node types |
 | `kb page-*` / `session-*` / `messages` / `message-add` | Knowledge-base pages and chat sessions/messages |
@@ -124,6 +139,20 @@ inv doctor
 | `version` | Print the CLI version |
 
 All data commands support `--json` for machine-readable output.
+
+### Agent onboarding
+
+For Claude Code, Codex, Cursor, or any MCP-capable agent, run:
+
+```bash
+inv login --api-key inv_live_...
+inv setup agent --json
+```
+
+The output includes shell env, MCP snippets, a first-run smoke test, an eval
+dataset seed command, and a counterfactual launch command. By default generated
+snippets redact the secret; pass `--show-secret` only when writing directly into
+a private local config.
 
 > **Auth note:** reads accept an agent **or** operator key. Writes that mutate
 > business facts — `receipt create`/`batch` and `ask` — require an **agent API

@@ -1,5 +1,8 @@
 import { describe, it, expect, beforeAll, afterEach, vi } from "vitest";
 import type { Command } from "commander";
+import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { COMMANDS } from "../commands/completions.js";
 
 process.env.INVARIANCE_CLI_SKIP_PARSE = "1";
@@ -39,6 +42,7 @@ describe("command wiring", () => {
       "metrics",
       "eval",
       "capture",
+      "setup",
       "completions",
       "doctor",
       "version",
@@ -159,6 +163,57 @@ describe("command wiring", () => {
     expect(subs(auth)).toEqual(
       ["login", "logout", "whoami", "signup", "signin", "refresh", "issue-key"].sort(),
     );
+  });
+
+  it("setup agent validates the key and prints agent-ready MCP/eval commands", async () => {
+    process.env.INVARIANCE_API_KEY = "inv_test_env_1234";
+    process.env.INVARIANCE_BASE_URL = "https://api.test";
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          agent: {
+            id: "agent_1",
+            name: "Test Agent",
+            public_key: null,
+            project_id: "proj_1",
+            created_at: "2026-01-01T00:00:00.000Z",
+          },
+          api_key: {
+            id: "key_1",
+            prefix: "inv_test",
+            label: "dev",
+            created_at: "2026-01-01T00:00:00.000Z",
+          },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+    const logs: string[] = [];
+    const logSpy = vi.spyOn(console, "log").mockImplementation((chunk?: unknown) => {
+      logs.push(String(chunk ?? ""));
+    });
+    const program = buildProgram();
+    program.exitOverride();
+
+    await program.parseAsync(["--json", "setup", "agent", "--no-save"], { from: "user" });
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(String(fetchSpy.mock.calls[0]?.[0])).toBe("https://api.test/v1/agents/me");
+    const output = JSON.parse(logs.join("\n").trimEnd());
+    expect(output).toMatchObject({
+      ok: true,
+      agent_id: "agent_1",
+      project_id: "proj_1",
+      saved: false,
+      env: {
+        INVARIANCE_API_KEY: "inv_test...1234",
+        INVARIANCE_API_URL: "https://api.test",
+      },
+    });
+    expect(output.mcp.codex.config_toml).toContain("[mcp_servers.invariance]");
+    expect(output.commands.eval_seed_suite).toContain("eval dataset seed-suite");
+    expect(output.commands.counterfactual).toContain("cortex counterfactual launch");
+    logSpy.mockRestore();
   });
 
   it("dna query posts to /v1/dna/query", async () => {
@@ -393,6 +448,99 @@ describe("command wiring", () => {
     expect(JSON.parse(String(fetchSpy.mock.calls[0]?.[1]?.body))).toEqual({ run_id: "r_1" });
     expect(JSON.parse(writes.join("").trimEnd())).toMatchObject({ id: "cap_2", run_id: "r_1" });
     writeSpy.mockRestore();
+  });
+
+  it("eval dataset seed-suite creates dataset, suite, examples, cases, and optional run", async () => {
+    process.env.INVARIANCE_API_KEY = "inv_test_key";
+    process.env.INVARIANCE_BASE_URL = "https://api.test";
+    const dir = mkdtempSync(join(tmpdir(), "inv-cli-evals-"));
+    const file = join(dir, "cases.jsonl");
+    writeFileSync(
+      file,
+      [
+        JSON.stringify({
+          name: "refund-approved",
+          input: { prompt: "approve refund" },
+          expected: { assertions: [{ path: "outcome", op: "equals", value: "approved" }] },
+        }),
+        JSON.stringify({
+          input: { prompt: "deny refund" },
+          expected: { assertions: [{ path: "outcome", op: "equals", value: "denied" }] },
+          mutations: [{ kind: "replace_prompt", value: "deny refund without supervisor approval" }],
+        }),
+      ].join("\n"),
+    );
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({
+          dataset: { id: "ds_1", name: "refund-regression" },
+          suite: { id: "es_1", name: "refund-regression" },
+          examples: [
+            { id: "ex_1", dataset_id: "ds_1" },
+            { id: "ex_2", dataset_id: "ds_1" },
+          ],
+          cases: [
+            { id: "ec_1", dataset_example_id: "ex_1" },
+            { id: "ec_2", dataset_example_id: "ex_2" },
+          ],
+          eval_run: { id: "erun_1", status: "passed" },
+        }), {
+          status: 201,
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
+    const writes: string[] = [];
+    const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation((chunk: unknown) => {
+      writes.push(String(chunk));
+      return true;
+    });
+    const program = buildProgram();
+    program.exitOverride();
+
+    try {
+      await program.parseAsync(
+        [
+          "--json",
+          "eval",
+          "dataset",
+          "seed-suite",
+          "--name",
+          "refund-regression",
+          "--file",
+          file,
+          "--run",
+        ],
+        { from: "user" },
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+      writeSpy.mockRestore();
+    }
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(String(fetchSpy.mock.calls[0]?.[0])).toBe("https://api.test/v1/eval-datasets/seed-suite");
+    expect(JSON.parse(String(fetchSpy.mock.calls[0]?.[1]?.body))).toMatchObject({
+      name: "refund-regression",
+      target_type: "custom",
+      run: true,
+      rows: [
+        expect.objectContaining({
+          name: "refund-approved",
+          input: { prompt: "approve refund" },
+        }),
+        expect.objectContaining({
+          input: { prompt: "deny refund" },
+        }),
+      ],
+    });
+    const output = JSON.parse(writes.join("").trimEnd());
+    expect(output).toMatchObject({
+      dataset_id: "ds_1",
+      suite_id: "es_1",
+      case_count: 2,
+      eval_run: { id: "erun_1" },
+    });
   });
 
   it("run inspect returns composite shape with observability summary", async () => {

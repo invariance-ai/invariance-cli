@@ -53,6 +53,8 @@ import {
   type EvalResultRecord,
   type EvalSuiteRecord,
   type EvalCaseRecord,
+  type SeedEvalSuiteRequest,
+  type SeedEvalSuiteResponse,
   type CompareResponse,
   RecipeSchema,
   RecipeListSchema,
@@ -929,6 +931,12 @@ export class InvarianceClient {
     return res.example;
   }
 
+  async seedEvalSuite(input: SeedEvalSuiteRequest): Promise<SeedEvalSuiteResponse> {
+    return this.request<SeedEvalSuiteResponse>("POST", "/v1/eval-datasets/seed-suite", {
+      body: input,
+    });
+  }
+
   // ── Evals: scorers ──
 
   async createEvalScorer(input: {
@@ -956,12 +964,37 @@ export class InvarianceClient {
     name: string;
     description?: string;
     target_type?: string;
+    dataset_id?: string | null;
+    scorer_ids?: string[];
     metadata?: Record<string, unknown>;
   }): Promise<EvalSuiteRecord> {
     const res = await this.request<{ suite: EvalSuiteRecord }>("POST", "/v1/eval-suites", {
       body: { target_type: "run", ...input },
     });
     return res.suite;
+  }
+
+  async createEvalCase(
+    suiteId: string,
+    input: {
+      name: string;
+      dataset_example_id?: string;
+      source_run_id?: string;
+      source_finding_id?: string;
+      source_graph_ref?: string;
+      input_bundle?: Record<string, unknown>;
+      mutations?: unknown[];
+      expected?: Record<string, unknown>;
+      assertions?: unknown[];
+      metadata?: Record<string, unknown>;
+    },
+  ): Promise<EvalCaseRecord> {
+    const res = await this.request<{ case: EvalCaseRecord }>(
+      "POST",
+      `/v1/eval-suites/${encodeURIComponent(suiteId)}/cases`,
+      { body: input },
+    );
+    return res.case;
   }
 
   async createEvalCaseFromRun(

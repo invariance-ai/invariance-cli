@@ -270,12 +270,38 @@ describe("auth helpers", () => {
   it("createEvalSuite posts to /v1/eval-suites with a default target_type", async () => {
     fetchSpy.mockResolvedValueOnce(jsonResponse({ suite: { id: "es_1", name: "demo" } }));
     const c = new InvarianceClient({ apiKey: "k", baseUrl: BASE });
-    const suite = await c.createEvalSuite({ name: "demo" });
+    const suite = await c.createEvalSuite({ name: "demo", dataset_id: "ds_1" });
     expect(suite).toMatchObject({ id: "es_1" });
     const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
     expect(url).toBe(`${BASE}/v1/eval-suites`);
     expect(init.method).toBe("POST");
-    expect(JSON.parse(init.body as string)).toMatchObject({ name: "demo", target_type: "run" });
+    expect(JSON.parse(init.body as string)).toMatchObject({
+      name: "demo",
+      target_type: "run",
+      dataset_id: "ds_1",
+    });
+  });
+
+  it("createEvalCase posts dataset-example backed cases to the suite cases route", async () => {
+    fetchSpy.mockResolvedValueOnce(
+      jsonResponse({ case: { id: "ec_1", dataset_example_id: "ex_1" } }),
+    );
+    const c = new InvarianceClient({ apiKey: "k", baseUrl: BASE });
+    const created = await c.createEvalCase("es_1", {
+      name: "happy",
+      dataset_example_id: "ex_1",
+      input_bundle: { prompt: "hi" },
+      expected: { output: "hello" },
+    });
+    expect(created).toMatchObject({ id: "ec_1", dataset_example_id: "ex_1" });
+    const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`${BASE}/v1/eval-suites/es_1/cases`);
+    expect(JSON.parse(init.body as string)).toMatchObject({
+      name: "happy",
+      dataset_example_id: "ex_1",
+      input_bundle: { prompt: "hi" },
+      expected: { output: "hello" },
+    });
   });
 
   it("createEvalCaseFromRun posts run + signal provenance to the from-run route", async () => {
@@ -312,5 +338,32 @@ describe("auth helpers", () => {
     expect(run.failures).toHaveLength(1);
     expect(run.failures?.[0]).toMatchObject({ case_id: "ec_1", path: "entities" });
     expect(run.results_url).toContain("/evals?run=");
+  });
+
+  it("seedEvalSuite posts rows to /v1/eval-datasets/seed-suite", async () => {
+    fetchSpy.mockResolvedValueOnce(
+      jsonResponse({
+        dataset: { id: "ds_1", name: "agent-regression" },
+        suite: { id: "es_1", name: "agent-regression" },
+        examples: [{ id: "ex_1" }],
+        cases: [{ id: "ec_1" }],
+        eval_run: { id: "erun_1", status: "passed" },
+      }),
+    );
+    const c = new InvarianceClient({ apiKey: "k", baseUrl: BASE });
+    const seeded = await c.seedEvalSuite({
+      name: "agent-regression",
+      rows: [{ name: "happy", input: { prompt: "ship" }, expected: { outcome: "ok" } }],
+      run: true,
+    });
+    expect(seeded.dataset.id).toBe("ds_1");
+    const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`${BASE}/v1/eval-datasets/seed-suite`);
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(init.body as string)).toMatchObject({
+      name: "agent-regression",
+      rows: [{ name: "happy", input: { prompt: "ship" }, expected: { outcome: "ok" } }],
+      run: true,
+    });
   });
 });

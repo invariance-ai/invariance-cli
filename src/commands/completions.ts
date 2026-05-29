@@ -94,6 +94,7 @@ export const COMMANDS: Record<string, string[]> = {
     "message-add",
   ],
   "node-type": ["list", "register"],
+  setup: ["agent"],
   completions: ["bash", "zsh", "fish"],
 };
 

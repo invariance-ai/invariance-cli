@@ -509,6 +509,31 @@ export interface EvalDatasetExample {
   updated_at: string;
 }
 
+export interface EvalAssertion {
+  path: string;
+  op:
+    | "equals"
+    | "not_equals"
+    | "contains"
+    | "not_contains"
+    | "present"
+    | "absent"
+    | "count_eq"
+    | "count_gte"
+    | "count_lte";
+  value?: unknown;
+  message?: string;
+}
+
+export type CounterfactualReplayMutation =
+  | { kind: "replace_prompt"; node_id?: string; value: string }
+  | { kind: "replace_context"; node_id?: string; value: unknown }
+  | { kind: "patch_node_input"; node_id: string; path: string; value: unknown }
+  | { kind: "patch_node_output"; node_id: string; path: string; value: unknown }
+  | { kind: "patch_node_metadata"; node_id: string; path: string; value: unknown }
+  | { kind: "drop_node"; node_id: string }
+  | { kind: "insert_node"; after_node_id?: string; node: Record<string, unknown> };
+
 export type EvalScorerKind = "assertion" | "code" | "llm" | "builtin";
 
 export interface EvalScorer {
@@ -570,16 +595,48 @@ export interface EvalCaseRecord {
   id: string;
   suite_id: string;
   agent_id: string;
+  dataset_example_id?: string | null;
   source_run_id: string | null;
   source_finding_id: string | null;
   source_signal_id: string | null;
   source_graph_ref: string | null;
   name: string;
   input_bundle: Record<string, unknown>;
+  mutations?: CounterfactualReplayMutation[];
   expected: Record<string, unknown>;
+  assertions?: EvalAssertion[];
   metadata: Record<string, unknown>;
   created_at: string;
   updated_at: string;
+}
+
+export interface SeedEvalSuiteRow {
+  name?: string;
+  input: Record<string, unknown>;
+  expected?: Record<string, unknown>;
+  assertions?: EvalAssertion[];
+  mutations?: CounterfactualReplayMutation[];
+  metadata?: Record<string, unknown>;
+}
+
+export interface SeedEvalSuiteRequest {
+  name: string;
+  description?: string;
+  target_type?: string;
+  scorer_ids?: string[];
+  dataset_metadata?: Record<string, unknown>;
+  suite_metadata?: Record<string, unknown>;
+  rows: SeedEvalSuiteRow[];
+  run?: boolean;
+  run_metadata?: Record<string, unknown>;
+}
+
+export interface SeedEvalSuiteResponse {
+  dataset: EvalDataset;
+  suite: EvalSuiteRecord;
+  examples: EvalDatasetExample[];
+  cases: EvalCaseRecord[];
+  eval_run?: EvalRunRecord;
 }
 
 export interface EvalResultRecord {

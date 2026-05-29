@@ -203,6 +203,77 @@ counterfactual.addCommand(
   ) as Command,
 );
 
+counterfactual.addCommand(
+  action(
+    new Command("launch")
+      .description(
+        "Launch a counterfactual_eval through the governed launcher. Defaults to sync mode and can return the structured result inline.",
+      )
+      .requiredOption(
+        "--target <type:ref>",
+        "Target as <type>:<ref>, e.g. run:run_123 or case:case_123",
+      )
+      .requiredOption(
+        "--question <str>",
+        "Hypothesis to evaluate (e.g. 'What if the refund policy required manager approval?')",
+      )
+      .requiredOption("--project-id <id>", "Project id")
+      .option("--mode <mode>", "sync (default, blocks) or async (enqueue)")
+      .option("--criteria <file>", "Path to JSON file with eval criteria")
+      .option("--payload <file>", "Path to JSON file with input_payload")
+      .option("--idempotency-key <key>", "Dedup key; a repeat returns the prior job"),
+    async ({ client, globals, opts }) => {
+      const { target_type, target_ref } = parseTarget(opts.target);
+      const body: CortexLaunchJobRequest = {
+        project_id: opts.projectId,
+        job_kind: "counterfactual_eval",
+        target_type,
+        target_ref,
+        question: opts.question,
+        mode: parseMode(opts.mode),
+      };
+      if (opts.criteria) body.criteria = readJsonFile("criteria", opts.criteria);
+      if (opts.payload) body.input_payload = readJsonFile("payload", opts.payload);
+      if (opts.idempotencyKey) body.idempotency_key = opts.idempotencyKey;
+      printValue(await client.launchCortexJob(body), globals);
+    },
+  ) as Command,
+);
+
+counterfactual.addCommand(
+  action(
+    new Command("list")
+      .description(
+        "List counterfactual_eval jobs only. Output (--json): {data, next_cursor}.",
+      )
+      .option("--status <s>", `Filter by status: ${["queued", "leased", "running", "succeeded", "failed", "dead", "cancelled"].join(", ")}`)
+      .option("--limit <n>", "Page size", parseIntFlag)
+      .option("--cursor <c>", "opaque pagination token from previous response's next_cursor"),
+    async ({ client, globals, opts }) => {
+      const page = await client.listCortexJobs({
+        status: opts.status,
+        kind: "counterfactual_eval",
+        limit: opts.limit,
+        cursor: opts.cursor,
+      });
+      printPage(page, CORTEX_JOB_COLUMNS, globals);
+    },
+  ) as Command,
+);
+
+counterfactual.addCommand(
+  action(
+    new Command("result")
+      .description(
+        "Get the structured result for a counterfactual job. Output (--json): {job_id, status, result?}.",
+      )
+      .argument("<job-id>", "Cortex job id (e.g. ctxjob_123)"),
+    async ({ client, globals, cmd }) => {
+      printValue(await client.getCortexJobResult(cmd.args[0]!), globals);
+    },
+  ) as Command,
+);
+
 cortexCommand.addCommand(counterfactual);
 
 // ── Governed launcher + read-only analyst ──
